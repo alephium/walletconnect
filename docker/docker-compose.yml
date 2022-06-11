@@ -32,7 +32,7 @@ services:
       redis:
         condition: service_healthy
   alephium:
-    image: alephium/dev-alephium:latest
+    image: alephium/dev-alephium:1.4.0-rc2
     networks:
       - walletconnect-test
     ports:

@@ -1,7 +1,11 @@
 import "mocha";
 import { expect } from "chai";
 
-import WalletConnectProvider from "../src/index";
+import WalletConnectProvider, {
+  formatChain,
+  isCompatibleChainGroup,
+  parseChain,
+} from "../src/index";
 import { WalletClient } from "./shared";
 import {
   groupOfAddress,
@@ -86,6 +90,22 @@ const TEST_WALLET_CLIENT_OPTS = {
   metadata: TEST_WALLET_METADATA,
   submitTx: true,
 };
+
+describe("Unit tests", function() {
+  const expectedChainGroup0 = 2;
+  const expectedChainGroup1 = undefined;
+
+  it("test util functions", () => {
+    expect(formatChain(4, expectedChainGroup0)).to.eql("alephium:4/2");
+    expect(formatChain(4, expectedChainGroup1)).to.eql("alephium:4/-1");
+    expect(isCompatibleChainGroup(2, expectedChainGroup0)).to.eql(true);
+    expect(isCompatibleChainGroup(1, expectedChainGroup0)).to.eql(false);
+    expect(isCompatibleChainGroup(2, expectedChainGroup1)).to.eql(true);
+    expect(isCompatibleChainGroup(1, expectedChainGroup1)).to.eql(true);
+    expect(parseChain("alephium:4/2")).to.eql([4, 2]);
+    expect(parseChain("alephium:4/-1")).to.eql([4, undefined]);
+  });
+});
 
 describe("WalletConnectProvider with single chainGroup", function() {
   this.timeout(30_000);

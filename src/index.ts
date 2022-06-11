@@ -93,7 +93,7 @@ class WalletConnectProvider implements SignerProvider {
 
   public static namespace = "alephium";
   public networkId: number;
-  public chainGroup: number;
+  public chainGroup?: number;
   public methods = signerMethods;
 
   public accounts: Account[] = [];
@@ -192,7 +192,9 @@ class WalletConnectProvider implements SignerProvider {
     return this.typedRequest("alph_signContractCreationTx", params);
   }
 
-  public async signExecuteScriptTx(params: SignExecuteScriptTxParams): Promise<SignExecuteScriptTxResult> {
+  public async signExecuteScriptTx(
+    params: SignExecuteScriptTxParams,
+  ): Promise<SignExecuteScriptTxResult> {
     return this.typedRequest("alph_signScriptTx", params);
   }
 
@@ -296,7 +298,7 @@ class WalletConnectProvider implements SignerProvider {
     }
 
     const newAccounts = parsedAccounts.filter(account =>
-      isCompatibleChainGroup(this.chainGroup, account.group),
+      isCompatibleChainGroup(account.group, this.chainGroup),
     );
     if (!this.sameAccounts(newAccounts, this.accounts)) {
       this.accounts = newAccounts;
@@ -309,17 +311,19 @@ export function isCompatibleChain(chain: string): boolean {
   return chain.startsWith(`${WalletConnectProvider.namespace}:`);
 }
 
-export function formatChain(networkId: number, chainGroup: number): string {
-  return `${WalletConnectProvider.namespace}:${networkId}/${chainGroup}`;
+export function formatChain(networkId: number, chainGroup?: number): string {
+  const chainGroupEncoded = chainGroup !== undefined ? chainGroup : -1;
+  return `${WalletConnectProvider.namespace}:${networkId}/${chainGroupEncoded}`;
 }
 
-export function isCompatibleChainGroup(expectedChainGroup: number, chainGroup: number): boolean {
-  return expectedChainGroup === -1 || expectedChainGroup === chainGroup;
+export function isCompatibleChainGroup(chainGroup: number, expectedChainGroup?: number): boolean {
+  return expectedChainGroup === undefined || expectedChainGroup === chainGroup;
 }
 
-export function parseChain(chainString: string): [number, number] {
+export function parseChain(chainString: string): [number, number | undefined] {
   const [namespace, networkId, chainGroup] = chainString.replace(/\//g, ":").split(":");
-  return [parseInt(networkId, 10), parseInt(chainGroup, 10)];
+  const chainGroupDecoded = parseInt(chainGroup, 10);
+  return [parseInt(networkId, 10), chainGroupDecoded === -1 ? undefined : chainGroupDecoded];
 }
 
 export function formatAccount(permittedChain: string, account: Account): string {

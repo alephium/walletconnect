@@ -47,10 +47,7 @@ export class WalletClient {
   public permittedChainGroup?: number;
 
   get permittedChain(): string {
-    if (
-      typeof this.permittedNetworkId === "undefined" ||
-      typeof this.permittedChainGroup === "undefined"
-    ) {
+    if (typeof this.permittedNetworkId === "undefined") {
       throw new Error("Permitted chain is not set");
     }
     return formatChain(this.permittedNetworkId, this.permittedChainGroup);
@@ -145,13 +142,10 @@ export class WalletClient {
   }
 
   private getSessionState(): { accounts: string[] } {
-    if (
-      typeof this.permittedNetworkId === "undefined" ||
-      typeof this.permittedChainGroup === "undefined"
-    ) {
+    if (typeof this.permittedNetworkId === "undefined") {
       throw new Error("Permitted chains are not set");
     }
-    const groupMatched = isCompatibleChainGroup(this.permittedChainGroup, this.signer.group);
+    const groupMatched = isCompatibleChainGroup(this.signer.group, this.permittedChainGroup);
     if (groupMatched) {
       return { accounts: [formatAccount(this.permittedChain, this.account)] };
     } else {
@@ -163,14 +157,12 @@ export class WalletClient {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
     if (typeof this.permittedNetworkId === "undefined") return;
-    if (typeof this.permittedChainGroup === "undefined") return;
     await this.client.update({ topic: this.topic, state: this.getSessionState() });
   }
 
   private async upgradeSession() {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
-    if (typeof this.permittedChainGroup === "undefined") return;
     await this.client.upgrade({
       topic: this.topic,
       permissions: {

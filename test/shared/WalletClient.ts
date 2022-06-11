@@ -12,8 +12,8 @@ import {
   SignHexStringParams,
   SignMessageParams,
   Account,
-} from "alephium-web3";
-import { PrivateKeyWallet } from "alephium-web3/test";
+} from "@alephium/web3";
+import { PrivateKeyWallet } from "@alephium/web3/test";
 
 import WalletConnectProvider, {
   isCompatibleChainGroup,

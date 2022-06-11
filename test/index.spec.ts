@@ -16,8 +16,8 @@ import {
   Script,
   verifyHexString,
   verifySignedMessage,
-} from "alephium-web3";
-import { PrivateKeyWallet } from "alephium-web3/test";
+} from "@alephium/web3";
+import { PrivateKeyWallet } from "@alephium/web3/test";
 
 const NETWORK_ID = 4;
 const CHAIN_GROUP = 2;

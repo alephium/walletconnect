@@ -24,7 +24,7 @@ import {
   SignMessageParams,
   SignMessageResult,
   groupOfAddress,
-} from "alephium-web3";
+} from "@alephium/web3";
 
 // Note:
 // 1. the wallet client could potentially submit the signed transaction.

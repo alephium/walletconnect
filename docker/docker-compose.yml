@@ -1,0 +1,66 @@
+version: "3.9"
+
+networks:
+  walletconnect-test:
+
+services:
+  redis:
+    image: redis:6-alpine
+    networks:
+      - walletconnect-test
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  relay:
+    image: walletconnect/relay-server:v2.0-dev
+    networks:
+      - walletconnect-test
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - 5555:5000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://relay:5000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      redis:
+        condition: service_healthy
+  alephium:
+    image: alephium/dev-alephium:1.4.0-rc2
+    networks:
+      - walletconnect-test
+    ports:
+      - 19973:19973/tcp
+      - 19973:19973/udp
+      - 127.0.0.1:20973:20973
+      - 127.0.0.1:21973:21973
+      - 127.0.0.1:22973:22973
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./devnet.conf:/alephium-home/.alephium/user.conf
+    healthcheck:
+      test: ["CMD", "curl", "http://alephium:22973/infos/self-clique"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  tests:
+    image: alephium/walletconnect-provider
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    networks:
+      - walletconnect-test
+    environment:
+      - TEST_RELAY_URL=ws://relay:5000
+    depends_on:
+      relay:
+        condition: service_healthy
+      alephium:
+        condition: service_healthy

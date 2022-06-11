@@ -81,7 +81,7 @@ export class WalletClient {
   constructor(provider: WalletConnectProvider, opts: Partial<WalletClientOpts>) {
     this.provider = provider;
     this.networkId = opts?.networkId || 4;
-    this.rpcUrl = opts?.rpcUrl || "http://127.0.0.1:22973";
+    this.rpcUrl = opts?.rpcUrl || "http://alephium:22973";
     this.submitTx = opts?.submitTx || false;
     this.nodeProvider = new NodeProvider(this.rpcUrl);
     this.signer = this.getWallet(this.nodeProvider, opts.privateKey);

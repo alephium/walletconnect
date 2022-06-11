@@ -22,7 +22,7 @@ import { PrivateKeyWallet } from "@alephium/web3/test";
 const NETWORK_ID = 4;
 const CHAIN_GROUP = 2;
 const PORT = 22973;
-const RPC_URL = `http://127.0.0.1:${PORT}`;
+const RPC_URL = `http://alephium:${PORT}`;
 
 const nodeProvider = new NodeProvider(RPC_URL);
 const signerA = new PrivateKeyWallet(

@@ -1,12 +1,12 @@
 {
-  "name": "alephium-walletconnect-provider",
+  "name": "@alephium/walletconnect-provider",
   "description": "Alephium Provider for WalletConnect Protocol",
-  "version": "0.1.2",
+  "version": "0.0.1",
   "author": "Alephium dev",
-  "homepage": "https://github.com/alephium-web3/alephium-walletconnect",
+  "homepage": "https://github.com/alephium/walletconnect",
   "repository": {
     "type": "git",
-    "url": "git@github.com:alephium-web3/alephium-walletconnect.git"
+    "url": "git@github.com:alephium/walletconnect.git"
   },
   "license": "Apache-2.0",
   "main": "dist/cjs/index.js",

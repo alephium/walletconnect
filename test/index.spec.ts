@@ -270,7 +270,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
 
     await provider.signTransferTx({
       signerAddress: signerA.address,
-      destinations: [{ address: ACCOUNTS.b.address, alphAmount: ONE_ALPH }],
+      destinations: [{ address: ACCOUNTS.b.address, attoAlphAmount: ONE_ALPH }],
     });
     await checkBalanceDecreasing();
 

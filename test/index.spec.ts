@@ -1,32 +1,32 @@
 import SignClient from '@walletconnect/sign-client';
-import "mocha";
-import { expect } from "chai";
+import 'mocha';
+import { expect } from 'chai';
 
-import WalletConnectProvider, { SIGNER_METHODS, SIGNER_EVENTS, SessionMetadata } from "../src/index";
+import WalletConnectProvider, { SIGNER_METHODS, SIGNER_EVENTS, SessionMetadata } from '../src/index';
 
 const NETWORK_ID = 4;
 const CHAIN_GROUP = 2;
 
 const TEST_PROJECT_ID = process.env.TEST_PROJECT_ID
   ? process.env.TEST_PROJECT_ID
-  : "6e2562e43678dd68a9070a62b6d52207";
+  : '6e2562e43678dd68a9070a62b6d52207';
 
 const TEST_RELAY_URL = process.env.TEST_RELAY_URL
   ? process.env.TEST_RELAY_URL
-  : "wss://relay.walletconnect.com";
+  : 'wss://relay.walletconnect.com';
 
 const TEST_APP_METADATA = {
-  name: "Test App",
-  description: "Test App for WalletConnect",
-  url: "https://walletconnect.com/",
-  icons: ["https://avatars.githubusercontent.com/u/37784886"],
+  name: 'Test App',
+  description: 'Test App for WalletConnect',
+  url: 'https://walletconnect.com/',
+  icons: ['https://avatars.githubusercontent.com/u/37784886'],
 };
 
 const TEST_WALLET_METADATA = {
-  name: "Test Wallet",
-  description: "Test Wallet for WalletConnect",
-  url: "https://walletconnect.com/",
-  icons: ["https://avatars.githubusercontent.com/u/37784886"],
+  name: 'Test Wallet',
+  description: 'Test Wallet for WalletConnect',
+  url: 'https://walletconnect.com/',
+  icons: ['https://avatars.githubusercontent.com/u/37784886'],
 };
 
 const TEST_PROVIDER_OPTS = {
@@ -46,7 +46,7 @@ const TEST_DAPP_OPTS = {
   metadata: TEST_APP_METADATA
 };
 
-describe("WalletConnectProvider with single chainGroup", function() {
+describe('WalletConnectProvider with single chainGroup', function() {
   this.timeout(30_000);
 
   let signClientWallet: SignClient;
@@ -68,6 +68,19 @@ describe("WalletConnectProvider with single chainGroup", function() {
             methods: SIGNER_METHODS,
             events: SIGNER_EVENTS
           }
+        }
+      })
+    });
+
+    signClientWallet.on('session_event', async (event) => {
+      const result  = {}
+      console.log(event);
+      await signClientWallet.respond({
+        topic: metaWallet.topic,
+        response: {
+          id: event.id,
+          jsonrpc: '2.0',
+          result
         }
       })
     });
@@ -99,25 +112,25 @@ describe("WalletConnectProvider with single chainGroup", function() {
   after(async () => {
     await Promise.all([
       new Promise<void>(async resolve => {
-        providerForDapp.session.on("session_delete", () => {
+        providerForDapp.session.on('session_delete', () => {
           console.log('session deleted for dapp');
           resolve();
         });
         await providerForDapp.session.disconnect({
           topic: metaDapp.topic,
-          reason: { code: 1, message: "testing complete" }
+          reason: { code: 1, message: 'testing complete' }
         });
         console.log('disconnected dapp');
         resolve();
       }),
       new Promise<void>(async resolve => {
-        signClientWallet.on("session_delete", () => {
+        signClientWallet.on('session_delete', () => {
           console.log('session deleted for wallet');
           resolve();
         });
         await signClientWallet.disconnect({
           topic: metaWallet.topic,
-          reason: { code: 1, message: "testing complete" }
+          reason: { code: 1, message: 'testing complete' }
         });
         console.log('disconnected wallet');
         resolve();
@@ -125,6 +138,15 @@ describe("WalletConnectProvider with single chainGroup", function() {
     ]);
   });
 
-  it('is happy', () => {
+  it('uses a valid method', async (done) => {
+  });
+
+  it('rejects an invalid method', () => {
+  });
+
+  it('reacts to an arbitrary valid event', () => {
+  });
+
+  it('ignores an arbitrary invalid event', () => {
   });
 });

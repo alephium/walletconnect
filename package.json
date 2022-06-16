@@ -32,14 +32,11 @@
   },
   "dependencies": {
     "@alephium/web3": "0.1.0-rc.3",
-    "@walletconnect/client": "^2.0.0-beta.23",
     "@walletconnect/jsonrpc-http-connection": "^1.0.0",
     "@walletconnect/jsonrpc-provider": "^1.0.2",
     "@walletconnect/jsonrpc-types": "^1.0.0",
     "@walletconnect/jsonrpc-utils": "^1.0.0",
-    "@walletconnect/signer-connection": "^2.0.0-beta.23",
-    "@walletconnect/types": "^2.0.0-beta.23",
-    "@walletconnect/utils": "^2.0.0-beta.23",
+    "@walletconnect/signer-connection": "^2.0.0-beta.101",
     "eventemitter3": "^4.0.7"
   },
   "devDependencies": {
@@ -56,6 +53,11 @@
     "@types/node": "^14.14.2",
     "@typescript-eslint/eslint-plugin": "^2.24.0",
     "@typescript-eslint/parser": "^2.24.0",
+    "@walletconnect/client": "^2.0.0-beta.23",
+    "@walletconnect/sign-client": "^2.0.0-beta.101",
+    "@walletconnect/types": "^2.0.0-beta.101",
+    "better-sqlite3": "^7.5.3",
+    "buffer": "^6.0.3",
     "chai": "^4.2.0",
     "core-js": "^3.6.5",
     "crypto-browserify": "^3.12.0",

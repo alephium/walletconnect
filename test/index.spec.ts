@@ -2,7 +2,7 @@ import SignClient from '@walletconnect/sign-client';
 import "mocha";
 import { expect } from "chai";
 
-import WalletConnectProvider, { signerMethods, SessionMetadata } from "../src/index";
+import WalletConnectProvider, { SIGNER_METHODS, SIGNER_EVENTS, SessionMetadata } from "../src/index";
 
 const NETWORK_ID = 4;
 const CHAIN_GROUP = 2;
@@ -57,7 +57,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
 
   before(async () => {
     const signClientDapp = await SignClient.init(TEST_DAPP_OPTS);
-    const signClientWallet = await SignClient.init(TEST_WALLET_CLIENT_OPTS);
+    signClientWallet = await SignClient.init(TEST_WALLET_CLIENT_OPTS);
 
     signClientWallet.on('session_proposal', async (proposal) => {
       metaWallet = await signClientWallet.approve({
@@ -65,8 +65,8 @@ describe("WalletConnectProvider with single chainGroup", function() {
         namespaces: {
           alephium: {
             accounts: [],
-            methods: ['alph_signContractCreationTx', 'alph_signScriptTx', 'alph_signTransferTx', 'alph_getAccounts'],
-            events: []
+            methods: SIGNER_METHODS,
+            events: SIGNER_EVENTS
           }
         }
       })
@@ -82,8 +82,8 @@ describe("WalletConnectProvider with single chainGroup", function() {
       requiredNamespaces: {
         alephium: {
           chains: [providerForDapp.permittedChain],
-          methods: signerMethods,
-          events: []
+          methods: SIGNER_METHODS,
+          events: SIGNER_EVENTS
         }
       }
     });
@@ -93,18 +93,28 @@ describe("WalletConnectProvider with single chainGroup", function() {
     }
 
     metaDapp = await approval();
+    providerForDapp.setSessionMetadata(metaDapp);
   });
 
   after(async () => {
     await Promise.all([
       new Promise<void>(async resolve => {
+        providerForDapp.session.on("session_delete", () => {
+          console.log('session deleted for dapp');
+          resolve();
+        });
         await providerForDapp.session.disconnect({
           topic: metaDapp.topic,
           reason: { code: 1, message: "testing complete" }
         });
         console.log('disconnected dapp');
+        resolve();
       }),
       new Promise<void>(async resolve => {
+        signClientWallet.on("session_delete", () => {
+          console.log('session deleted for wallet');
+          resolve();
+        });
         await signClientWallet.disconnect({
           topic: metaWallet.topic,
           reason: { code: 1, message: "testing complete" }
@@ -116,7 +126,5 @@ describe("WalletConnectProvider with single chainGroup", function() {
   });
 
   it('is happy', () => {
-    console.log(providerForDapp);
-    console.log(signClientWallet);
   });
 });

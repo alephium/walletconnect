@@ -26,7 +26,7 @@ type Awaited<T> = T extends PromiseLike<infer U>
   ? { 0: Awaited<U>; 1: U }[U extends PromiseLike<any> ? 0 : 1]
   : T
 
-export const signerMethods = [
+export const SIGNER_METHODS = [
   "alph_getAccounts",
 
   // Can also submit the signed transaction via the connected wallet.
@@ -40,8 +40,7 @@ export const signerMethods = [
   "alph_signMessage",
 ];
 
-type SignerMethodsTuple = typeof signerMethods;
-type SignerMethods = SignerMethodsTuple[number];
+type SignerMethods = (typeof SIGNER_METHODS)[number];
 
 interface SignerMethodsTable extends Record<SignerMethods, { params: any; result: any }> {
   alph_getAccounts: {
@@ -77,6 +76,13 @@ interface SignerMethodsTable extends Record<SignerMethods, { params: any; result
 export type MethodParams<T extends SignerMethods> = SignerMethodsTable[T]["params"];
 export type MethodResult<T extends SignerMethods> = SignerMethodsTable[T]["result"];
 
+export const SIGNER_EVENTS = [
+  "accountsChanged",
+  "networkChanged",
+]
+
+type SignerEvents = (typeof SIGNER_METHODS)[number];
+
 export type SessionMetadata = Awaited<ReturnType<ISignClient["approve"]>>;
 
 export interface WalletConnectProviderOptions {
@@ -92,7 +98,7 @@ class WalletConnectProvider implements SignerProvider {
   public meta?: SessionMetadata;
   public session: SignClient;
 
-  private methods = signerMethods;
+  private methods = SIGNER_METHODS;
 
   get permittedChain(): string {
     return formatChain(this.networkId, this.chainGroup);

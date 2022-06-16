@@ -19,6 +19,7 @@ module.exports = {
   resolve: {
     extensions: [".tsx", ".ts", ".js"],
     fallback: {
+      buffer: require.resolve("buffer/"),
       fs: false,
       stream: require.resolve("stream-browserify"),
       crypto: require.resolve("crypto-browserify"),

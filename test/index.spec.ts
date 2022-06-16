@@ -60,7 +60,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
     const signClientWallet = await SignClient.init(TEST_WALLET_CLIENT_OPTS);
 
     signClientWallet.on('session_proposal', async (proposal) => {
-      await signClientWallet.approve({
+      metaWallet = await signClientWallet.approve({
         id: proposal.id,
         namespaces: {
           alephium: {
@@ -92,20 +92,12 @@ describe("WalletConnectProvider with single chainGroup", function() {
       await signClientWallet.pair({ uri });
     }
 
-    metaWallet = await approval();
+    metaDapp = await approval();
   });
 
   after(async () => {
     await Promise.all([
       new Promise<void>(async resolve => {
-        providerForDapp.session.on("session_delete", () => {
-          console.log('session deleted for dapp');
-          resolve();
-        });
-        providerForDapp.session.on("pairing_delete", (event) => {
-          console.log('pairing deleted for dapp');
-          resolve();
-        });
         await providerForDapp.session.disconnect({
           topic: metaDapp.topic,
           reason: { code: 1, message: "testing complete" }
@@ -113,14 +105,6 @@ describe("WalletConnectProvider with single chainGroup", function() {
         console.log('disconnected dapp');
       }),
       new Promise<void>(async resolve => {
-        signClientWallet.on("session_delete", () => {
-          console.log('session deleted for wallet');
-          resolve();
-        });
-        signClientWallet.on("pairing_delete", (event) => {
-          console.log('pairing deleted for wallet');
-          resolve();
-        });
         await signClientWallet.disconnect({
           topic: metaWallet.topic,
           reason: { code: 1, message: "testing complete" }

@@ -40,7 +40,6 @@
     "@walletconnect/signer-connection": "2.0.0-beta.26",
     "@walletconnect/types": "2.0.0-beta.26",
     "@walletconnect/utils": "2.0.0-beta.26",
-    "alephium-web3": "^0.9.3",
     "eventemitter3": "^4.0.7"
   },
   "devDependencies": {

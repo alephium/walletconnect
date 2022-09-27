@@ -1,7 +1,4 @@
-import Client, { CLIENT_EVENTS } from "@walletconnect/client";
-import { ClientOptions, IClient, SessionTypes } from "@walletconnect/types";
-import { ERROR } from "@walletconnect/utils";
-import { SIGNER_EVENTS } from "@walletconnect/signer-connection";
+import { SessionTypes, SignClientTypes } from "@walletconnect/types";
 import { formatJsonRpcError, formatJsonRpcResult } from "@walletconnect/jsonrpc-utils";
 import {
   NodeProvider,
@@ -13,15 +10,15 @@ import {
   SignMessageParams,
   Account,
 } from "@alephium/web3";
-import { PrivateKeyWallet } from "@alephium/web3/test";
+import { PrivateKeyWallet } from "@alephium/web3-wallet";
 
 import WalletConnectProvider, {
-  isCompatibleChainGroup,
   parseChain,
   formatChain,
   formatAccount,
   providerEvents,
 } from "../../src";
+import SignClient from "@walletconnect/sign-client";
 
 export interface WalletClientOpts {
   privateKey: string;
@@ -30,7 +27,7 @@ export interface WalletClientOpts {
   submitTx?: boolean;
 }
 
-export type WalletClientAsyncOpts = WalletClientOpts & ClientOptions;
+export type WalletClientAsyncOpts = WalletClientOpts & SignClientTypes.Options;
 
 export class WalletClient {
   public provider: WalletConnectProvider;
@@ -40,8 +37,10 @@ export class WalletClient {
   public rpcUrl: string;
   public submitTx: boolean;
 
-  public client?: IClient;
+  public client?: SignClient;
   public topic?: string;
+
+  public namespaces?: SessionTypes.Namespaces;
 
   public permittedNetworkId?: number;
   public permittedChainGroup?: number;
@@ -51,6 +50,10 @@ export class WalletClient {
       throw new Error("Permitted chain is not set");
     }
     return formatChain(this.permittedNetworkId, this.permittedChainGroup);
+  }
+
+  get currentChain(): string {
+    return formatChain(this.networkId, this.permittedChainGroup);
   }
 
   static async init(
@@ -84,7 +87,7 @@ export class WalletClient {
     this.rpcUrl = opts?.rpcUrl || "http://alephium:22973";
     this.submitTx = opts?.submitTx || false;
     this.nodeProvider = new NodeProvider(this.rpcUrl);
-    this.signer = this.getWallet(this.nodeProvider, opts.privateKey);
+    this.signer = this.getWallet(opts.privateKey);
   }
 
   public async changeAccount(privateKey: string) {
@@ -94,17 +97,24 @@ export class WalletClient {
 
   public async changeChain(networkId: number, rpcUrl: string) {
     this.setNetworkId(networkId, rpcUrl);
-    await this.updateChain();
+    await this.updateChainId();
   }
 
   public async disconnect() {
     if (!this.client) return;
     if (!this.topic) return;
-    await this.client.disconnect({ topic: this.topic, reason: ERROR.USER_DISCONNECTED.format() });
+
+    await this.client.disconnect({
+      topic: this.topic,
+      reason: {
+        code: 0,
+        message: "disconnect"
+      }
+    });
   }
 
   private setAccount(privateKey: string) {
-    this.signer = this.getWallet(this.nodeProvider, privateKey);
+    this.signer = this.getWallet(privateKey);
   }
 
   private setNetworkId(networkId: number, rpcUrl: string) {
@@ -119,59 +129,44 @@ export class WalletClient {
   private async emitAccountsChangedEvent() {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
-    const notification = {
-      type: providerEvents.changed.accounts,
-      data: [formatAccount(this.permittedChain, this.account)],
+    const event = {
+      name: providerEvents.changed.accounts,
+      data: [
+        formatAccount(`alephium:${this.networkId}/0`, this.account)
+      ],
     };
-    await this.client.notify({ topic: this.topic, notification });
+    await this.client.emit({
+      topic: this.topic,
+      event,
+      chainId: `alephium:${this.networkId}/0`
+    });
   }
 
   private async emitChainChangedEvent() {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
-    const notification = { type: providerEvents.changed.network, data: this.networkId };
-    await this.client.notify({ topic: this.topic, notification });
+    const event = {
+      name: providerEvents.changed.network,
+      data: this.networkId
+    }
+    // TODO: Figure out how to do groups
+    await this.client.emit({ topic: this.topic, event, chainId: this.currentChain });
   }
 
-  private getWallet(nodeProvider: NodeProvider, privateKey?: string): PrivateKeyWallet {
+  private getWallet(privateKey?: string): PrivateKeyWallet {
     const wallet =
       typeof privateKey !== "undefined"
-        ? new PrivateKeyWallet(nodeProvider, privateKey)
-        : PrivateKeyWallet.Random(nodeProvider);
+        ? new PrivateKeyWallet(privateKey)
+        : PrivateKeyWallet.Random();
     return wallet;
-  }
-
-  private getSessionState(): { accounts: string[] } {
-    if (typeof this.permittedNetworkId === "undefined") {
-      throw new Error("Permitted chains are not set");
-    }
-    const groupMatched = isCompatibleChainGroup(this.signer.group, this.permittedChainGroup);
-    if (groupMatched) {
-      return { accounts: [formatAccount(this.permittedChain, this.account)] };
-    } else {
-      return { accounts: [] };
-    }
   }
 
   private async updateSession() {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
+    if (typeof this.namespaces === "undefined") return;
     if (typeof this.permittedNetworkId === "undefined") return;
-    await this.client.update({ topic: this.topic, state: this.getSessionState() });
-  }
-
-  private async upgradeSession() {
-    if (typeof this.client === "undefined") return;
-    if (typeof this.topic === "undefined") return;
-    await this.client.upgrade({
-      topic: this.topic,
-      permissions: {
-        blockchain: {
-          chains: [formatChain(this.networkId, this.permittedChainGroup)],
-        },
-      },
-    });
-    await this.updateAccounts();
+    await this.client.update({ topic: this.topic, namespaces: this.namespaces });
   }
 
   private async updateAccounts() {
@@ -179,13 +174,13 @@ export class WalletClient {
     await this.emitAccountsChangedEvent();
   }
 
-  private async updateChain() {
-    await this.upgradeSession();
+  private async updateChainId() {
+    await this.updateSession();
     await this.emitChainChangedEvent();
   }
 
-  private async initialize(opts?: ClientOptions) {
-    this.client = await Client.init({ ...opts, controller: true });
+  private async initialize(opts?: SignClientTypes.Options) {
+    this.client = await SignClient.init(opts);
     this.registerEventListeners();
   }
 
@@ -195,7 +190,7 @@ export class WalletClient {
     }
 
     // auto-pair
-    this.provider.signer.connection.on(SIGNER_EVENTS.uri, async ({ uri }) => {
+    this.provider.on("display_uri", async (uri: string) => {
       if (typeof this.client === "undefined") {
         throw new Error("Client not initialized");
       }
@@ -203,28 +198,55 @@ export class WalletClient {
     });
 
     // auto-approve
-    this.client.on(CLIENT_EVENTS.session.proposal, async (proposal: SessionTypes.Proposal) => {
-      if (typeof this.client === "undefined") {
-        throw new Error("Client not initialized");
-      }
-      const permittedChain = proposal.permissions.blockchain.chains[0];
-      if (typeof permittedChain === "undefined") {
-        throw new Error("No chain is permitted");
-      }
-      [this.permittedNetworkId, this.permittedChainGroup] = parseChain(permittedChain);
-      const response = { state: this.getSessionState() };
-      const session = await this.client.approve({ proposal, response });
-      this.topic = session.topic;
-    });
+    this.client.on(
+      "session_proposal",
+      async (proposal: SignClientTypes.EventArguments["session_proposal"]) => {
+        if (typeof this.client === "undefined") throw new Error("Sign Client not inititialized");
+        const { id, requiredNamespaces, relays } = proposal.params;
+
+        const namespaces = {};
+        Object.entries(requiredNamespaces).forEach(([key, value]) => {
+          namespaces[key] = {
+            methods: value.methods,
+            events: value.events,
+            accounts: value.chains.map((chain) => `${chain}:${this.accounts[0].address}`),
+            extension: value.extension?.map((ext) => ({
+              methods: ext.methods,
+              events: ext.events,
+              accounts: ext.chains.map((chain) => `${chain}:${this.accounts[0].address}`),
+            })),
+          };
+        });
+
+        const permittedChain = requiredNamespaces["alephium"].chains[0]
+
+        if (typeof permittedChain === "undefined") {
+          throw new Error("No chain is permitted");
+        }
+
+        [this.permittedNetworkId, this.permittedChainGroup] = parseChain(permittedChain);
+
+        const { acknowledged } = await this.client.approve({
+          id,
+          relayProtocol: relays[0].protocol,
+          namespaces,
+        });
+        const session = await acknowledged();
+        this.topic = session.topic;
+        this.namespaces = namespaces;
+      },
+    );
 
     // auto-respond
     this.client.on(
-      CLIENT_EVENTS.session.request,
-      async (requestEvent: SessionTypes.RequestEvent) => {
+      "session_request",
+      async (requestEvent: SignClientTypes.EventArguments["session_request"]) => {
         if (typeof this.client === "undefined") {
           throw new Error("Client not initialized");
         }
-        const { topic, chainId, request } = requestEvent;
+
+        const { topic, params, id } = requestEvent;
+        const { chainId, request } = params;
 
         // ignore if unmatched topic
         if (topic !== this.topic) return;
@@ -236,9 +258,9 @@ export class WalletClient {
           }
 
           // reject if unmatched chain
-          if (this.permittedChain != chainId) {
+          if (this.currentChain != chainId) {
             throw new Error(
-              `Target chain (${chainId}) does not match active chain (${this.permittedChain})`,
+              `Target chain (${chainId}) does not match current chain (${this.currentChain})`,
             );
           }
 
@@ -282,11 +304,11 @@ export class WalletClient {
             throw new Error("Result was undefined");
           }
 
-          const response = formatJsonRpcResult(request.id, result);
+          const response = formatJsonRpcResult(id, result);
           await this.client.respond({ topic, response });
         } catch (e) {
           const message = e.message || e.toString();
-          const response = formatJsonRpcError(request.id, message);
+          const response = formatJsonRpcError(id, message);
           await this.client.respond({ topic, response });
         }
       },

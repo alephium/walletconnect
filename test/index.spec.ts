@@ -5,32 +5,34 @@ import WalletConnectProvider, {
   formatChain,
   isCompatibleChainGroup,
   parseChain,
+  signerMethods,
 } from "../src/index";
 import { WalletClient } from "./shared";
 import {
-  groupOfAddress,
+  web3,
   node,
   Account,
   NodeProvider,
-  Contract,
-  Script,
   verifyHexString,
   verifySignedMessage,
+  Project,
 } from "@alephium/web3";
-import { PrivateKeyWallet } from "@alephium/web3/test";
+import { PrivateKeyWallet } from "@alephium/web3-wallet";
+import { SignClientTypes } from "@walletconnect/types";
+import SignClient from "@walletconnect/sign-client";
 
 const NETWORK_ID = 4;
 const CHAIN_GROUP = 2;
 const PORT = 22973;
-const RPC_URL = `http://alephium:${PORT}`;
+const RPC_URL = `http://localhost:${PORT}`;
 
 const nodeProvider = new NodeProvider(RPC_URL);
+web3.setCurrentNodeProvider(RPC_URL)
 const signerA = new PrivateKeyWallet(
-  nodeProvider,
   "a642942e67258589cd2b1822c631506632db5a12aabcf413604e785300d762a5",
 );
-const signerB = PrivateKeyWallet.Random(nodeProvider);
-const signerC = PrivateKeyWallet.Random(nodeProvider);
+const signerB = PrivateKeyWallet.Random();
+const signerC = PrivateKeyWallet.Random();
 const ACCOUNTS = {
   a: {
     address: "1DrDyTr9RpRsQnDnXo2YRiPzPW4ooHX5LLoqXrqfMrpQH",
@@ -48,6 +50,7 @@ const ACCOUNTS = {
     group: signerC.group,
   },
 };
+
 const ONE_ALPH = "1000000000000000000";
 
 const TEST_RELAY_URL = process.env.TEST_RELAY_URL
@@ -69,17 +72,18 @@ const TEST_WALLET_METADATA = {
 };
 
 const TEST_PROVIDER_OPTS = {
-  networkId: NETWORK_ID,
-  chainGroup: CHAIN_GROUP,
+  logger: "error",
+  permittedChains: [{
+    networkId: NETWORK_ID,
+    chainGroup: CHAIN_GROUP
+  }],
   rpc: {
     custom: {
       [NETWORK_ID]: RPC_URL,
     },
   },
-  client: {
-    relayUrl: TEST_RELAY_URL,
-    metadata: TEST_APP_METADATA,
-  },
+  relayUrl: TEST_RELAY_URL,
+  metadata: TEST_APP_METADATA,
 };
 
 const TEST_WALLET_CLIENT_OPTS = {
@@ -89,6 +93,36 @@ const TEST_WALLET_CLIENT_OPTS = {
   relayUrl: TEST_RELAY_URL,
   metadata: TEST_WALLET_METADATA,
   submitTx: true,
+};
+
+export const TEST_NAMESPACES_CONFIG = {
+  namespaces: {
+    alephium: {
+      methods: signerMethods,
+      chains: [
+        `alephium:${formatChain(1, CHAIN_GROUP)}`,
+        `alephium:${formatChain(NETWORK_ID, CHAIN_GROUP)}`
+      ],
+      events: ["chainChanged", "accountsChanged"],
+      rpcMap: {
+        [formatChain(NETWORK_ID, CHAIN_GROUP)]: RPC_URL
+      }
+    }
+  }
+};
+
+export const TEST_PROJECT_ID = process.env.TEST_PROJECT_ID
+  ? process.env.TEST_PROJECT_ID
+  : undefined;
+
+export const TEST_SIGN_CLIENT_OPTIONS: SignClientTypes.Options = {
+  //  logger: "trace",
+  relayUrl: TEST_RELAY_URL,
+  projectId: TEST_PROJECT_ID,
+  storageOptions: {
+    database: ":memory:",
+  },
+  metadata: TEST_APP_METADATA
 };
 
 describe("Unit tests", function() {
@@ -113,17 +147,30 @@ describe("WalletConnectProvider with single chainGroup", function() {
   let provider: WalletConnectProvider;
   let walletClient: WalletClient;
   let walletAddress: string;
+
   before(async () => {
+    const signClient = await SignClient.init(TEST_SIGN_CLIENT_OPTIONS);
     provider = new WalletConnectProvider({
       ...TEST_PROVIDER_OPTS,
-      chainGroup: groupOfAddress(ACCOUNTS.a.address),
+      client: signClient,
+      permittedChains: [
+        {
+          networkId: NETWORK_ID,
+          chainGroup: signerA.group
+        },
+        {
+          networkId: 1,
+          chainGroup: signerA.group
+        }
+      ]
     });
     walletClient = await WalletClient.init(provider, TEST_WALLET_CLIENT_OPTS);
     walletAddress = walletClient.signer.address;
     expect(walletAddress).to.eql(ACCOUNTS.a.address);
     const providerAccounts = await provider.connect();
-    expect(providerAccounts.map(a => a.address)).to.eql([walletAddress]);
+    expect(providerAccounts.map(a => a.address)).to.eql([walletAddress, walletAddress]);
   });
+
   after(async () => {
     // disconnect provider
     await Promise.all([
@@ -141,6 +188,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
     expect(walletClient.client?.session.values.length).to.eql(0);
     expect(provider.connected).to.be.false;
   });
+
   it("networkChanged", async () => {
     // change to testnet
     await Promise.all([
@@ -148,7 +196,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
         provider.on("networkChanged", chainId => {
           try {
             expect(chainId).to.eql(1);
-            expect(provider.networkId).to.eql(1);
+            expect(provider.currentChainInfo.networkId).to.eql(1);
             resolve();
           } catch (e) {
             reject(e);
@@ -165,6 +213,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
         }
       }),
     ]);
+
     // change back to devnet
     await Promise.all([
       new Promise<void>((resolve, reject) => {
@@ -188,6 +237,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
       }),
     ]);
   });
+
   it("accountsChanged", async () => {
     const changes: Account[][] = [];
     provider.on("accountsChanged", accounts => {
@@ -198,11 +248,13 @@ describe("WalletConnectProvider with single chainGroup", function() {
       new Promise<void>((resolve, reject) => {
         provider.on("accountsChanged", accounts => {
           try {
-            if (ACCOUNTS.c.group == ACCOUNTS.a.group) {
-              expect(accounts[0].address).to.eql(ACCOUNTS.c.address);
-            } else {
-              expect(accounts).to.eql([]);
-            }
+            // TODO: Consider group
+            // if (ACCOUNTS.c.group == ACCOUNTS.a.group) {
+            //   expect(accounts[0].address).to.eql(ACCOUNTS.c.address);
+            // } else {
+            //   expect(accounts).to.eql([]);
+            // }
+            expect(accounts[0].address).to.eql(ACCOUNTS.c.address);
             resolve();
           } catch (e) {
             reject(e);
@@ -220,6 +272,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
         }
       }),
     ]);
+
     // change back to account a
     await Promise.all([
       new Promise<void>((resolve, reject) => {
@@ -259,22 +312,23 @@ describe("WalletConnectProvider with single chainGroup", function() {
   }
 
   it("should sign", async () => {
+    await Project.build()
     const accounts = await provider.getAccounts();
+
     expect(!!accounts).to.be.true;
     expect(accounts[0].address).to.eql(ACCOUNTS.a.address);
 
     balance = await nodeProvider.addresses.getAddressesAddressBalance(ACCOUNTS.a.address);
     expect(balance.utxoNum).to.eql(1);
-
     expect(walletClient.submitTx).to.be.true;
 
     await provider.signTransferTx({
       signerAddress: signerA.address,
       destinations: [{ address: ACCOUNTS.b.address, attoAlphAmount: ONE_ALPH }],
     });
-    await checkBalanceDecreasing();
 
-    const greeter = await Contract.fromSource(nodeProvider, "greeter.ral");
+    await checkBalanceDecreasing();
+    const greeter = Project.contract("Greeter");
 
     const greeterParams = await greeter.paramsForDeployment({
       signerAddress: signerA.address,
@@ -283,7 +337,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
     const greeterResult = await signerA.signDeployContractTx(greeterParams);
     await checkBalanceDecreasing();
 
-    const main = await Script.fromSource(nodeProvider, "greeter_main.ral");
+    const main = Project.script("Main");
     const mainParams = await main.paramsForDeployment({
       signerAddress: signerA.address,
       initialFields: { greeterContractId: greeterResult.contractId },
@@ -314,14 +368,32 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
   let walletClient: WalletClient;
   let walletAddress: string;
   before(async () => {
-    const { chainGroup, ...providerOpts } = TEST_PROVIDER_OPTS;
-    provider = new WalletConnectProvider({ chainGroup: -1, ...providerOpts });
+    const signClient = await SignClient.init(TEST_SIGN_CLIENT_OPTIONS);
+    const { permittedChains, ...providerOpts } = TEST_PROVIDER_OPTS;
+    provider = new WalletConnectProvider({
+      permittedChains: [
+        {
+          networkId: NETWORK_ID,
+          chainGroup: -1
+        },
+        {
+          networkId: 1,
+          chainGroup: -1
+        }
+      ],
+      client: signClient,
+      ...providerOpts
+    });
     walletClient = await WalletClient.init(provider, TEST_WALLET_CLIENT_OPTS);
     walletAddress = walletClient.signer.address;
     expect(walletAddress).to.eql(ACCOUNTS.a.address);
     const providerAccounts = await provider.connect();
-    expect(providerAccounts.map(a => a.address)).to.eql([walletAddress]);
+    expect(providerAccounts.map(a => a.address)).to.eql([
+      walletAddress,
+      walletAddress,
+    ]);
   });
+
   after(async () => {
     // disconnect provider
     await Promise.all([
@@ -339,6 +411,7 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
     expect(walletClient.client?.session.values.length).to.eql(0);
     expect(provider.connected).to.be.false;
   });
+
   it("networkChanged", async () => {
     // change to testnet
     await Promise.all([
@@ -362,6 +435,7 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
         }
       }),
     ]);
+
     // change back to devnet
     await Promise.all([
       new Promise<void>((resolve, reject) => {
@@ -396,7 +470,6 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
       new Promise<void>(async (resolve, reject) => {
         try {
           await walletClient.changeAccount(ACCOUNTS.c.privateKey);
-
           resolve();
         } catch (e) {
           reject(e);
@@ -414,6 +487,7 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
         });
       }),
     ]);
+
     // change back to account a
     await Promise.all([
       new Promise<void>(async (resolve, reject) => {

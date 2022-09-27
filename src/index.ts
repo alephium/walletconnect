@@ -23,8 +23,10 @@ import {
   SignHexStringResult,
   SignMessageParams,
   SignMessageResult,
-  groupOfAddress,
 } from "@alephium/web3";
+
+import SignClient from "@walletconnect/sign-client";
+import { getChainsFromNamespaces, getAccountsFromNamespaces } from "@walletconnect/utils";
 
 // Note:
 // 1. the wallet client could potentially submit the signed transaction.
@@ -77,13 +79,18 @@ export type MethodResult<T extends SignerMethods> = SignerMethodsTable[T]["resul
 export const providerEvents = {
   changed: {
     network: "networkChanged",
-    accounts: "accountsChanged",
+    accounts: "accountsChanged"
   },
+  displayUri: "display_uri"
 };
 
-export interface WalletConnectProviderOptions {
+export interface ChainInfo {
   networkId: number;
-  chainGroup: number;
+  chainGroup?: number;
+}
+
+export interface WalletConnectProviderOptions {
+  permittedChains: ChainInfo[];
   methods?: string[];
   client?: SignerConnectionClientOpts;
 }
@@ -92,21 +99,34 @@ class WalletConnectProvider implements SignerProvider {
   public events: any = new EventEmitter();
 
   public static namespace = "alephium";
-  public networkId: number;
-  public chainGroup?: number;
+  public currentChainInfo: ChainInfo;
+  public permittedChainsInfo: ChainInfo[];
   public methods = signerMethods;
 
   public accounts: Account[] = [];
 
   public signer: JsonRpcProvider;
 
-  get permittedChain(): string {
-    return formatChain(this.networkId, this.chainGroup);
+  get permittedChains(): string[] {
+    return this.permittedChainsInfo.flatMap((info) => {
+      if (info.chainGroup === -1) {
+        return [0, 1, 2, 3].map((group) => formatChain(info.networkId, group))
+      }
+      return [formatChain(info.networkId, info.chainGroup)]
+    })
+  }
+
+  get currentChain(): string {
+    return formatChain(this.currentChainInfo.networkId, this.currentChainInfo.chainGroup);
   }
 
   constructor(opts: WalletConnectProviderOptions) {
-    this.networkId = opts.networkId;
-    this.chainGroup = opts.chainGroup;
+    if (opts.permittedChains.length == 0) {
+      throw new Error(`No permittedChains`);
+    }
+
+    this.currentChainInfo = opts.permittedChains[0]
+    this.permittedChainsInfo = opts.permittedChains
     this.methods = opts.methods ? [...opts.methods, ...this.methods] : this.methods;
     this.signer = this.setSignerProvider(opts.client);
     this.registerEventListeners();
@@ -129,7 +149,7 @@ class WalletConnectProvider implements SignerProvider {
         throw new Error(`Unknown signer address ${args.params.signerAddress}`);
       }
       return this.signer.request(args, {
-        chainId: formatChain(this.networkId, this.chainGroup),
+        chainId: formatChain(this.currentChainInfo.networkId, this.currentChainInfo.chainGroup),
       });
     }
     return Promise.reject(`Invalid method was passed ${args.method}`);
@@ -218,28 +238,35 @@ class WalletConnectProvider implements SignerProvider {
       if (chains && chains.length) this.setChain(chains);
       const accounts = (this.signer.connection as SignerConnection).accounts;
       if (accounts && accounts.length) this.setAccounts(accounts);
+      this.events.emit("connect");
     });
-    this.signer.connection.on(SIGNER_EVENTS.created, (session: SessionTypes.Settled) => {
-      this.setChain(session.permissions.blockchain.chains);
-      this.setAccounts(session.state.accounts);
+    this.signer.connection.on(SIGNER_EVENTS.created, (session: SessionTypes.Struct) => {
+      const chains = getChainsFromNamespaces(session.namespaces, ["alephium"]);
+      this.setChain(chains);
+      const accounts = getAccountsFromNamespaces(session.namespaces, ["alephium"]);
+      this.setAccounts(accounts);
     });
-    this.signer.connection.on(SIGNER_EVENTS.updated, (session: SessionTypes.Settled) => {
-      const chain = formatChain(this.networkId, this.chainGroup);
-      if (!session.permissions.blockchain.chains.includes(chain)) {
-        this.setChain(session.permissions.blockchain.chains);
-      }
-      this.setAccounts(session.state.accounts);
+    this.signer.connection.on(SIGNER_EVENTS.uri, async ({ uri }: { uri: string }) => {
+      this.events.emit(providerEvents.displayUri, uri);
+    });
+
+    this.signer.connection.on(SIGNER_EVENTS.updated, (session: SessionTypes.Struct) => {
+      const chains = getChainsFromNamespaces(session.namespaces, ["alephium"]);
+      this.setChain(chains);
+      const accounts = getAccountsFromNamespaces(session.namespaces, ["alephium"]);
+      this.setAccounts(accounts);
     });
     this.signer.connection.on(
-      SIGNER_EVENTS.notification,
-      (notification: SessionTypes.Notification) => {
-        if (notification.type === providerEvents.changed.accounts) {
-          this.setAccounts(notification.data);
-        } else if (notification.type === providerEvents.changed.network) {
-          this.networkId = notification.data;
-          this.events.emit(providerEvents.changed.network, this.networkId);
+      SIGNER_EVENTS.event,
+      (params: any) => {
+        const { event } = params;
+        if (event.name === providerEvents.changed.accounts) {
+          this.setAccounts(event.data);
+        } else if (event.name === providerEvents.changed.network) {
+          this.currentChainInfo.networkId = event.data;
+          this.events.emit(providerEvents.changed.network, this.currentChainInfo.networkId);
         } else {
-          this.events.emit(notification.type, notification.data);
+          this.events.emit(event.name, event.data);
         }
       },
     );
@@ -248,11 +275,18 @@ class WalletConnectProvider implements SignerProvider {
     });
   }
 
-  private setSignerProvider(client?: SignerConnectionClientOpts) {
+  private setSignerProvider(
+    client?: SignerConnectionClientOpts
+  ) {
     const connection = new SignerConnection({
-      chains: [formatChain(this.networkId, this.chainGroup)],
-      methods: this.methods,
       client,
+      requiredNamespaces: {
+        "alephium": {
+          chains: this.permittedChains,
+          methods: this.methods,
+          events: ["chainChanged", "accountsChanged", "networkChanged"]
+        }
+      }
     });
     return new JsonRpcProvider(connection);
   }
@@ -265,7 +299,7 @@ class WalletConnectProvider implements SignerProvider {
     }
   }
 
-  private lastSetChains?: string[];
+  private lastSetChains?: string[]
   private setChain(chains: string[]) {
     if (this.sameChains(chains, this.lastSetChains)) {
       return;
@@ -275,8 +309,9 @@ class WalletConnectProvider implements SignerProvider {
 
     const compatible = chains.filter(x => isCompatibleChain(x));
     if (compatible.length) {
-      [this.networkId, this.chainGroup] = parseChain(compatible[0]);
-      this.events.emit(providerEvents.changed.network, this.networkId);
+      const [networkId, chainGroup] = parseChain(compatible[0]);
+      this.currentChainInfo = { networkId, chainGroup }
+      this.events.emit(providerEvents.changed.network, networkId);
     }
   }
 
@@ -298,9 +333,10 @@ class WalletConnectProvider implements SignerProvider {
     }
 
     const newAccounts = parsedAccounts.filter(account =>
-      isCompatibleChainGroup(account.group, this.chainGroup),
+      isCompatibleChainGroup(account.group, this.currentChainInfo.chainGroup),
     );
-    if (!this.sameAccounts(newAccounts, this.accounts)) {
+
+    if (newAccounts && !this.sameAccounts(newAccounts, this.accounts)) {
       this.accounts = newAccounts;
       this.events.emit(providerEvents.changed.accounts, newAccounts);
     }
@@ -331,11 +367,11 @@ export function formatAccount(permittedChain: string, account: Account): string 
 }
 
 export function parseAccount(account: string): Account {
-  const [namespace, permittedChain, address, publicKey] = account.replace(/\+/g, ":").split(":");
+  const [namespace, networkId, group, address, publicKey] = account.replace(/\+|\//g, ":").split(":");
   return {
     address: address,
     publicKey: publicKey,
-    group: groupOfAddress(address),
+    group: +group
   };
 }
 

@@ -1,7 +1,7 @@
 {
-  "name": "@alephium/walletconnect-provider",
+  "name": "@h0ngcha0/walletconnect-provider",
   "description": "Alephium Provider for WalletConnect Protocol",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "author": "Alephium dev",
   "homepage": "https://github.com/alephium/walletconnect",
   "repository": {
@@ -31,8 +31,8 @@
     "lint": "eslint -c '.eslintrc' --fix './src/**/*.ts'"
   },
   "dependencies": {
-    "@alephium/web3": "0.2.0-rc.17",
-    "@alephium/web3-wallet": "0.2.0-rc.17",
+    "@alephium/web3": "0.2.0-rc.25",
+    "@alephium/web3-wallet": "0.2.0-rc.25",
     "@walletconnect/jsonrpc-http-connection": "^1.0.3",
     "@walletconnect/jsonrpc-provider": "^1.0.3",
     "@walletconnect/jsonrpc-types": "^1.0.1",

@@ -6,12 +6,12 @@ import WalletConnectProvider, {
   isCompatibleChainGroup,
   parseChain,
   signerMethods,
+  ChainGroup
 } from "../src/index";
 import { WalletClient } from "./shared";
 import {
   web3,
   node,
-  Account,
   NodeProvider,
   verifyHexString,
   verifySignedMessage,
@@ -31,11 +31,12 @@ web3.setCurrentNodeProvider(RPC_URL)
 const signerA = new PrivateKeyWallet(
   "a642942e67258589cd2b1822c631506632db5a12aabcf413604e785300d762a5",
 );
-const signerB = PrivateKeyWallet.Random();
-const signerC = PrivateKeyWallet.Random();
+const signerB = PrivateKeyWallet.Random(1);
+const signerC = PrivateKeyWallet.Random(2);
+const signerD = PrivateKeyWallet.Random(3);
 const ACCOUNTS = {
   a: {
-    address: "1DrDyTr9RpRsQnDnXo2YRiPzPW4ooHX5LLoqXrqfMrpQH",
+    address: signerA.address,
     privateKey: signerA.privateKey,
     group: signerA.group,
   },
@@ -49,6 +50,11 @@ const ACCOUNTS = {
     privateKey: signerC.privateKey,
     group: signerC.group,
   },
+  d: {
+    address: signerD.address,
+    privateKey: signerD.privateKey,
+    group: signerD.group,
+  }
 };
 
 const ONE_ALPH = "1000000000000000000";
@@ -89,7 +95,8 @@ const TEST_PROVIDER_OPTS = {
 const TEST_WALLET_CLIENT_OPTS = {
   networkId: NETWORK_ID,
   rpcUrl: RPC_URL,
-  privateKey: ACCOUNTS.a.privateKey,
+  activePrivateKey: ACCOUNTS.a.privateKey,
+  otherPrivateKeys: [ACCOUNTS.b.privateKey, ACCOUNTS.c.privateKey, ACCOUNTS.d.privateKey],
   relayUrl: TEST_RELAY_URL,
   metadata: TEST_WALLET_METADATA,
   submitTx: true,
@@ -116,7 +123,7 @@ export const TEST_PROJECT_ID = process.env.TEST_PROJECT_ID
   : undefined;
 
 export const TEST_SIGN_CLIENT_OPTIONS: SignClientTypes.Options = {
-  //  logger: "trace",
+  //logger: "trace",
   relayUrl: TEST_RELAY_URL,
   projectId: TEST_PROJECT_ID,
   storageOptions: {
@@ -127,7 +134,7 @@ export const TEST_SIGN_CLIENT_OPTIONS: SignClientTypes.Options = {
 
 describe("Unit tests", function() {
   const expectedChainGroup0 = 2;
-  const expectedChainGroup1 = undefined;
+  const expectedChainGroup1 = -1;
 
   it("test util functions", () => {
     expect(formatChain(4, expectedChainGroup0)).to.eql("alephium:4/2");
@@ -137,7 +144,7 @@ describe("Unit tests", function() {
     expect(isCompatibleChainGroup(2, expectedChainGroup1)).to.eql(true);
     expect(isCompatibleChainGroup(1, expectedChainGroup1)).to.eql(true);
     expect(parseChain("alephium:4/2")).to.eql([4, 2]);
-    expect(parseChain("alephium:4/-1")).to.eql([4, undefined]);
+    expect(parseChain("alephium:4/-1")).to.eql([4, -1]);
   });
 });
 
@@ -156,11 +163,15 @@ describe("WalletConnectProvider with single chainGroup", function() {
       permittedChains: [
         {
           networkId: NETWORK_ID,
-          chainGroup: signerA.group
+          chainGroup: signerA.group as ChainGroup
         },
         {
           networkId: 1,
-          chainGroup: signerA.group
+          chainGroup: signerA.group as ChainGroup
+        },
+        {
+          networkId: NETWORK_ID,
+          chainGroup: signerC.group as ChainGroup
         }
       ]
     });
@@ -168,7 +179,10 @@ describe("WalletConnectProvider with single chainGroup", function() {
     walletAddress = walletClient.signer.address;
     expect(walletAddress).to.eql(ACCOUNTS.a.address);
     const providerAccounts = await provider.connect();
-    expect(providerAccounts.map(a => a.address)).to.eql([walletAddress, walletAddress]);
+    expect(providerAccounts.map(a => a.address)).to.eql([
+      signerA.address,
+      signerC.address
+    ]);
   });
 
   after(async () => {
@@ -179,10 +193,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
           resolve();
         });
       }),
-      new Promise<void>(async resolve => {
-        await walletClient.disconnect();
-        resolve();
-      }),
+      walletClient.disconnect()
     ]);
     // expect provider to be disconnected
     expect(walletClient.client?.session.values.length).to.eql(0);
@@ -191,109 +202,30 @@ describe("WalletConnectProvider with single chainGroup", function() {
 
   it("networkChanged", async () => {
     // change to testnet
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        provider.on("networkChanged", chainId => {
-          try {
-            expect(chainId).to.eql(1);
-            expect(provider.currentChainInfo.networkId).to.eql(1);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }),
-
-      new Promise<void>(async (resolve, reject) => {
-        try {
-          await walletClient.changeChain(1, "https://testnet-wallet.alephium.org");
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }),
-    ]);
+    await verifyNetworkChange(1, "https://testnet-wallet.alephium.org", provider, walletClient)
 
     // change back to devnet
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        provider.on("networkChanged", chain => {
-          try {
-            expect(chain).to.eql(NETWORK_ID);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }),
+    await verifyNetworkChange(NETWORK_ID, RPC_URL, provider, walletClient)
 
-      new Promise<void>(async (resolve, reject) => {
-        try {
-          await walletClient.changeChain(NETWORK_ID, RPC_URL);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }),
-    ]);
+    // change to mainnet, which is not supported
+    await expectThrowsAsync(
+      async () => await walletClient.changeChain(0, "https://mainet-wallet.alephium.org"),
+      "Error changing network id 0, chain alephium:0/0 not permitted"
+    )
   });
 
   it("accountsChanged", async () => {
-    const changes: Account[][] = [];
-    provider.on("accountsChanged", accounts => {
-      changes.push(accounts);
-    });
     // change to account c
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        provider.on("accountsChanged", accounts => {
-          try {
-            // TODO: Consider group
-            // if (ACCOUNTS.c.group == ACCOUNTS.a.group) {
-            //   expect(accounts[0].address).to.eql(ACCOUNTS.c.address);
-            // } else {
-            //   expect(accounts).to.eql([]);
-            // }
-            expect(accounts[0].address).to.eql(ACCOUNTS.c.address);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }),
-
-      new Promise<void>(async (resolve, reject) => {
-        try {
-          await walletClient.changeAccount(ACCOUNTS.c.privateKey);
-
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }),
-    ]);
+    await verifyAccountsChange(ACCOUNTS.c.privateKey, ACCOUNTS.c.address, provider, walletClient)
 
     // change back to account a
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        provider.on("accountsChanged", accounts => {
-          try {
-            expect(accounts[0].address).to.eql(ACCOUNTS.a.address);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }),
-      new Promise<void>(async (resolve, reject) => {
-        try {
-          await walletClient.changeAccount(ACCOUNTS.a.privateKey);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }),
-    ]);
+    await verifyAccountsChange(ACCOUNTS.a.privateKey, ACCOUNTS.a.address, provider, walletClient)
+
+    // change to account b, which is not supported
+    await expectThrowsAsync(
+      async () => await walletClient.changeAccount(ACCOUNTS.b.privateKey),
+      "Error changing account, chain alephium:4/1 not permitted"
+    )
   });
 
   function delay(ms: number) {
@@ -342,7 +274,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
       signerAddress: signerA.address,
       initialFields: { greeterContractId: greeterResult.contractId },
     });
-    const mainResult = await signerA.signExecuteScriptTx(mainParams);
+    await signerA.signExecuteScriptTx(mainParams);
     await checkBalanceDecreasing();
 
     const hexString = "48656c6c6f20416c65706869756d21";
@@ -367,6 +299,7 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
   let provider: WalletConnectProvider;
   let walletClient: WalletClient;
   let walletAddress: string;
+
   before(async () => {
     const signClient = await SignClient.init(TEST_SIGN_CLIENT_OPTIONS);
     const { permittedChains, ...providerOpts } = TEST_PROVIDER_OPTS;
@@ -389,8 +322,10 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
     expect(walletAddress).to.eql(ACCOUNTS.a.address);
     const providerAccounts = await provider.connect();
     expect(providerAccounts.map(a => a.address)).to.eql([
-      walletAddress,
-      walletAddress,
+      signerA.address,
+      signerB.address,
+      signerC.address,
+      signerD.address
     ]);
   });
 
@@ -402,10 +337,7 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
           resolve();
         });
       }),
-      new Promise<void>(async resolve => {
-        await walletClient.disconnect();
-        resolve();
-      }),
+      walletClient.disconnect()
     ]);
     // expect provider to be disconnected
     expect(walletClient.client?.session.values.length).to.eql(0);
@@ -414,101 +346,80 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
 
   it("networkChanged", async () => {
     // change to testnet
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        provider.on("networkChanged", chainId => {
-          try {
-            expect(chainId).to.eql(1);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }),
-
-      new Promise<void>(async (resolve, reject) => {
-        try {
-          await walletClient.changeChain(1, "https://testnet-wallet.alephium.org");
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }),
-    ]);
+    verifyNetworkChange(1, "https://testnet-wallet.alephium.org", provider, walletClient)
 
     // change back to devnet
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        provider.on("networkChanged", chain => {
-          try {
-            expect(chain).to.eql(NETWORK_ID);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }),
+    verifyNetworkChange(NETWORK_ID, RPC_URL, provider, walletClient)
 
-      new Promise<void>(async (resolve, reject) => {
-        try {
-          await walletClient.changeChain(NETWORK_ID, RPC_URL);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }),
-    ]);
+    // change to mainnet, which is not supported
+    await expectThrowsAsync(
+      async () => await walletClient.changeChain(0, "https://mainet-wallet.alephium.org"),
+      "Error changing network id 0, chain alephium:0/0 not permitted"
+    )
   });
 
   it("accountsChanged", async () => {
-    const changes: Account[][] = [];
-    provider.on("accountsChanged", accounts => {
-      changes.push(accounts);
-    });
     // change to account c
-    await Promise.all([
-      new Promise<void>(async (resolve, reject) => {
-        try {
-          await walletClient.changeAccount(ACCOUNTS.c.privateKey);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }),
-
-      new Promise<void>((resolve, reject) => {
-        provider.on("accountsChanged", accounts => {
-          try {
-            expect(accounts[0].address).to.eql(ACCOUNTS.c.address);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }),
-    ]);
+    await verifyAccountsChange(ACCOUNTS.c.privateKey, ACCOUNTS.c.address, provider, walletClient)
 
     // change back to account a
-    await Promise.all([
-      new Promise<void>(async (resolve, reject) => {
+    await verifyAccountsChange(ACCOUNTS.a.privateKey, ACCOUNTS.a.address, provider, walletClient)
+  });
+});
+
+async function verifyNetworkChange(
+  networkId: number,
+  rpcUrl: string,
+  provider: WalletConnectProvider,
+  walletClient: WalletClient
+) {
+  await Promise.all([
+    new Promise<void>((resolve, reject) => {
+      provider.on("networkChanged", networkId => {
         try {
-          await walletClient.changeAccount(ACCOUNTS.a.privateKey);
+          expect(networkId).to.eql(networkId);
+          expect(provider.networkId).to.eql(networkId);
           resolve();
         } catch (e) {
           reject(e);
         }
-      }),
+      });
+    }),
+    walletClient.changeChain(networkId, rpcUrl)
+  ]);
+}
 
-      new Promise<void>((resolve, reject) => {
-        provider.on("accountsChanged", accounts => {
-          try {
-            expect(accounts[0].address).to.eql(ACCOUNTS.a.address);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }),
-    ]);
-  });
-});
+async function verifyAccountsChange(
+  privateKey: string,
+  address: string,
+  provider: WalletConnectProvider,
+  walletClient: WalletClient
+) {
+  await Promise.all([
+    new Promise<void>((resolve, reject) => {
+      provider.on("accountsChanged", accounts => {
+        try {
+          expect(accounts[0].address).to.eql(address);
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }),
+    walletClient.changeAccount(privateKey)
+  ]);
+}
+
+async function expectThrowsAsync(
+  method: () => Promise<any>,
+  errorMessage: string
+) {
+  let error: Error | undefined = undefined
+  try {
+    await method()
+  } catch (err) {
+    error = err
+  }
+  expect(error).to.be.an('Error')
+  expect(error?.message).to.equal(errorMessage)
+}

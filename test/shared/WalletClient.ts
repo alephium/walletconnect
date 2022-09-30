@@ -18,11 +18,9 @@ import WalletConnectProvider, {
   formatChain,
   formatAccount,
   PROVIDER_EVENTS,
-  ALEPHIUM_NAMESPACE,
-  ChainInfo
+  ALEPHIUM_NAMESPACE
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
-import { SDK_TYPE } from "@walletconnect/utils";
 
 export interface WalletClientOpts {
   activePrivateKey: string;
@@ -259,7 +257,7 @@ export class WalletClient {
         const session = await acknowledged();
 
         this.topic = session.topic;
-        this.namespace = namespaces["alephium"]
+        this.namespace = namespaces[ALEPHIUM_NAMESPACE]
       },
     );
 

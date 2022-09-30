@@ -194,7 +194,7 @@ class WalletConnectProvider implements SignerProvider {
     method: T,
     params: MethodParams<T>,
   ): Promise<MethodResult<T>> {
-    return this.request({ method: method, params: params });
+    return this.request({ method, params });
   }
 
   public getAccounts(): Promise<Account[]> {
@@ -353,7 +353,7 @@ export function isCompatibleChainGroup(chainGroup: number, expectedChainGroup: n
 }
 
 export function parseChain(chainString: string): [number, ChainGroup] {
-  const [namespace, networkId, chainGroup] = chainString.replace(/\//g, ":").split(":");
+  const [_namespace, networkId, chainGroup] = chainString.replace(/\//g, ":").split(":");
   const chainGroupDecoded = parseInt(chainGroup, 10);
   return [parseInt(networkId, 10), chainGroupDecoded as ChainGroup];
 }
@@ -363,7 +363,7 @@ export function formatAccount(permittedChain: string, account: Account): string 
 }
 
 export function parseAccount(account: string): Account {
-  const [namespace, networkId, group, address, publicKey] = account.replace(/\+|\//g, ":").split(":");
+  const [_namespace, _networkId, group, address, publicKey] = account.replace(/\+|\//g, ":").split(":");
   return {
     address: address,
     publicKey: publicKey,

@@ -5,7 +5,6 @@ import WalletConnectProvider, {
   formatChain,
   isCompatibleChainGroup,
   parseChain,
-  signerMethods,
   ChainGroup
 } from "../src/index";
 import { WalletClient } from "./shared";
@@ -102,28 +101,12 @@ const TEST_WALLET_CLIENT_OPTS = {
   submitTx: true,
 };
 
-export const TEST_NAMESPACES_CONFIG = {
-  namespaces: {
-    alephium: {
-      methods: signerMethods,
-      chains: [
-        `alephium:${formatChain(1, CHAIN_GROUP)}`,
-        `alephium:${formatChain(NETWORK_ID, CHAIN_GROUP)}`
-      ],
-      events: ["chainChanged", "accountsChanged"],
-      rpcMap: {
-        [formatChain(NETWORK_ID, CHAIN_GROUP)]: RPC_URL
-      }
-    }
-  }
-};
-
 export const TEST_PROJECT_ID = process.env.TEST_PROJECT_ID
   ? process.env.TEST_PROJECT_ID
   : undefined;
 
 export const TEST_SIGN_CLIENT_OPTIONS: SignClientTypes.Options = {
-  //logger: "trace",
+  logger: "error",
   relayUrl: TEST_RELAY_URL,
   projectId: TEST_PROJECT_ID,
   storageOptions: {
@@ -179,6 +162,11 @@ describe("WalletConnectProvider with single chainGroup", function() {
     walletAddress = walletClient.signer.address;
     expect(walletAddress).to.eql(ACCOUNTS.a.address);
     const providerAccounts = await provider.connect();
+    expect(provider.chains).to.eql([
+      "alephium:4/0",
+      "alephium:1/0",
+      "alephium:4/2"
+    ])
     expect(providerAccounts.map(a => a.address)).to.eql([
       signerA.address,
       signerC.address
@@ -321,6 +309,16 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
     walletAddress = walletClient.signer.address;
     expect(walletAddress).to.eql(ACCOUNTS.a.address);
     const providerAccounts = await provider.connect();
+    expect(provider.chains).to.eql([
+      "alephium:4/0",
+      "alephium:4/1",
+      "alephium:4/2",
+      "alephium:4/3",
+      "alephium:1/0",
+      "alephium:1/1",
+      "alephium:1/2",
+      "alephium:1/3"
+    ])
     expect(providerAccounts.map(a => a.address)).to.eql([
       signerA.address,
       signerB.address,

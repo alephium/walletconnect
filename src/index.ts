@@ -42,7 +42,7 @@ export const signerMethods = [
 type SignerMethodsTuple = typeof signerMethods;
 type SignerMethods = SignerMethodsTuple[number];
 
-export type ChainGroup = -1 | 0 | 1 | 2 | 3
+export type ChainGroup = number | undefined
 
 interface SignerMethodsTable extends Record<SignerMethods, { params: any; result: any }> {
   alph_getAccounts: {
@@ -113,7 +113,7 @@ class WalletConnectProvider implements SignerProvider {
   get permittedChains(): string[] {
     return this.permittedChainsInfo.flatMap((info) => {
       // Permit all groups if chainGroup is -1
-      if (info.chainGroup === -1) {
+      if (info.chainGroup === undefined) {
         return [0, 1, 2, 3].map((group) => formatChain(info.networkId, group))
       }
       return [formatChain(info.networkId, info.chainGroup)]
@@ -345,17 +345,26 @@ export function isCompatibleChain(chain: string): boolean {
 }
 
 export function formatChain(networkId: number, chainGroup: number): string {
+  if (chainGroup < 0) {
+    throw new Error(`chainGroup ${chainGroup} needs to be positive`);
+  }
+
   return `${ALEPHIUM_NAMESPACE}:${networkId}/${chainGroup}`;
 }
 
-export function isCompatibleChainGroup(chainGroup: number, expectedChainGroup: number): boolean {
-  return expectedChainGroup === -1 || expectedChainGroup === chainGroup;
+export function isCompatibleChainGroup(chainGroup: number, expectedChainGroup: ChainGroup): boolean {
+  return expectedChainGroup === undefined || expectedChainGroup === chainGroup;
 }
 
-export function parseChain(chainString: string): [number, ChainGroup] {
+export function parseChain(chainString: string): [number, number] {
   const [_namespace, networkId, chainGroup] = chainString.replace(/\//g, ":").split(":");
   const chainGroupDecoded = parseInt(chainGroup, 10);
-  return [parseInt(networkId, 10), chainGroupDecoded as ChainGroup];
+
+  if (chainGroupDecoded < 0) {
+    throw new Error(`chainGroup ${chainGroup} in chain ${chainString} needs to be positive`);
+  }
+
+  return [parseInt(networkId, 10), chainGroupDecoded];
 }
 
 export function formatAccount(permittedChain: string, account: Account): string {

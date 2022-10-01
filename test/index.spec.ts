@@ -117,17 +117,19 @@ export const TEST_SIGN_CLIENT_OPTIONS: SignClientTypes.Options = {
 
 describe("Unit tests", function() {
   const expectedChainGroup0 = 2;
-  const expectedChainGroup1 = -1;
+  const expectedChainGroup1 = 1;
 
   it("test util functions", () => {
     expect(formatChain(4, expectedChainGroup0)).to.eql("alephium:4/2");
-    expect(formatChain(4, expectedChainGroup1)).to.eql("alephium:4/-1");
+    expect(formatChain(4, expectedChainGroup1)).to.eql("alephium:4/1");
+    expect(() => formatChain(4, -1)).to.throw("chainGroup -1 needs to be positive")
     expect(isCompatibleChainGroup(2, expectedChainGroup0)).to.eql(true);
     expect(isCompatibleChainGroup(1, expectedChainGroup0)).to.eql(false);
-    expect(isCompatibleChainGroup(2, expectedChainGroup1)).to.eql(true);
-    expect(isCompatibleChainGroup(1, expectedChainGroup1)).to.eql(true);
+    expect(isCompatibleChainGroup(2, undefined)).to.eql(true);
+    expect(isCompatibleChainGroup(1, undefined)).to.eql(true);
     expect(parseChain("alephium:4/2")).to.eql([4, 2]);
-    expect(parseChain("alephium:4/-1")).to.eql([4, -1]);
+    expect(parseChain("alephium:4/1")).to.eql([4, 1]);
+    expect(() => parseChain("alephium:4/-1")).to.throw("chainGroup -1 in chain alephium:4/-1 needs to be positive")
   });
 });
 
@@ -295,11 +297,11 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
       permittedChains: [
         {
           networkId: NETWORK_ID,
-          chainGroup: -1
+          chainGroup: undefined
         },
         {
           networkId: 1,
-          chainGroup: -1
+          chainGroup: undefined
         }
       ],
       client: signClient,

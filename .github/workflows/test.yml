@@ -20,7 +20,9 @@ jobs:
           npm audit --production
       - name: Integration test
         run: |
-          docker-compose -f docker/docker-compose.yml --force-recreate
+          pushd docker
+          docker-compose up -d
+          popd
           SECONDS=0
           until curl http://localhost:22973/infos/node
           do

@@ -84,15 +84,15 @@ export const PROVIDER_EVENTS = {
   disconnect: "disconnect",
   displayUri: "displayUri",
   networkChanged: "networkChanged",
-  accountsChanged: "accountsChanged"
-}
+  accountsChanged: "accountsChanged",
+};
 
 export interface ChainInfo {
   networkId: number;
   chainGroup: ChainGroup;
 }
 
-export const ALEPHIUM_NAMESPACE = "alephium"
+export const ALEPHIUM_NAMESPACE = "alephium";
 
 export interface WalletConnectProviderOptions {
   permittedChains: ChainInfo[];
@@ -102,7 +102,7 @@ export interface WalletConnectProviderOptions {
 
 class WalletConnectProvider implements SignerProvider {
   public events: any = new EventEmitter();
-  public networkId: number
+  public networkId: number;
   public permittedChainsInfo: ChainInfo[];
   public methods = signerMethods;
 
@@ -116,19 +116,19 @@ class WalletConnectProvider implements SignerProvider {
     return this.permittedChainsInfo.flatMap((info) => {
       // Permit all groups if chainGroup is -1
       if (info.chainGroup === undefined) {
-        return [0, 1, 2, 3].map((group) => formatChain(info.networkId, group))
+        return [0, 1, 2, 3].map((group) => formatChain(info.networkId, group));
       }
-      return [formatChain(info.networkId, info.chainGroup)]
-    })
+      return [formatChain(info.networkId, info.chainGroup)];
+    });
   }
 
   constructor(opts: WalletConnectProviderOptions) {
-    if (opts.permittedChains.length == 0) {
+    if (opts.permittedChains.length === 0) {
       throw new Error(`No permittedChains`);
     }
 
-    this.networkId = opts.permittedChains[0].networkId
-    this.permittedChainsInfo = opts.permittedChains
+    this.networkId = opts.permittedChains[0].networkId;
+    this.permittedChainsInfo = opts.permittedChains;
     this.methods = opts.methods ? [...opts.methods, ...this.methods] : this.methods;
     this.signer = this.setSignerProvider(opts.client);
     this.registerEventListeners();
@@ -151,10 +151,10 @@ class WalletConnectProvider implements SignerProvider {
         throw new Error(`Unknown signer address ${args.params.signerAddress}`);
       }
       return this.signer.request(args, {
-        chainId: formatChain(this.networkId, signerAccount.group)
+        chainId: formatChain(this.networkId, signerAccount.group),
       });
     }
-    return Promise.reject(`Invalid method was passed ${args.method}`);
+    return Promise.reject(new Error(`Invalid method was passed ${args.method}`));
   }
 
   public async connect(): Promise<GetAccountsResult> {
@@ -246,7 +246,7 @@ class WalletConnectProvider implements SignerProvider {
     });
 
     this.signer.connection.on(SIGNER_EVENTS.created, (session: SessionTypes.Struct) => {
-      this.updateNamespace(session)
+      this.updateNamespace(session);
     });
 
     this.signer.connection.on(SIGNER_EVENTS.uri, async ({ uri }: { uri: string }) => {
@@ -254,7 +254,7 @@ class WalletConnectProvider implements SignerProvider {
     });
 
     this.signer.connection.on(SIGNER_EVENTS.updated, (session: SessionTypes.Struct) => {
-      this.updateNamespace(session)
+      this.updateNamespace(session);
     });
 
     this.signer.connection.on(
@@ -274,17 +274,17 @@ class WalletConnectProvider implements SignerProvider {
   }
 
   private setSignerProvider(
-    client?: SignerConnectionClientOpts
+    client?: SignerConnectionClientOpts,
   ) {
     const connection = new SignerConnection({
       client,
       requiredNamespaces: {
-        "alephium": {
+        alephium: {
           chains: this.permittedChains,
           methods: this.methods,
-          events: ["chainChanged", "accountsChanged", "networkChanged"]
-        }
-      }
+          events: ["chainChanged", "accountsChanged", "networkChanged"],
+        },
+      },
     });
     return new JsonRpcProvider(connection);
   }
@@ -320,7 +320,7 @@ class WalletConnectProvider implements SignerProvider {
 
   private lastSetAccounts?: Account[];
   private setAccounts(accounts: string[]) {
-    const parsedAccounts = accounts.map(parseAccount)
+    const parsedAccounts = accounts.map(parseAccount);
     if (this.sameAccounts(parsedAccounts, this.lastSetAccounts)) {
       return;
     } else {
@@ -329,11 +329,11 @@ class WalletConnectProvider implements SignerProvider {
 
     const newAccounts = parsedAccounts
       .filter(account =>
-        this.chains.includes(formatChain(this.networkId, account.group))
+        this.chains.includes(formatChain(this.networkId, account.group)),
       )
       .filter((value, index, array) =>
-        array.findIndex(v => (v.address === value.address)) === index
-      )
+        array.findIndex(v => (v.address === value.address)) === index,
+      );
 
     if (newAccounts.length !== 0 && !this.sameAccounts(newAccounts, this.accounts)) {
       this.accounts = newAccounts;
@@ -375,8 +375,8 @@ export function formatAccount(permittedChain: string, account: Account): string 
 
 export function parseAccount(account: string): Account {
   const [_namespace, _networkId, _group, publicKey] = account.replace(/\//g, ":").split(":");
-  const address = addressFromPublicKey(publicKey)
-  const group = groupOfAddress(address)
+  const address = addressFromPublicKey(publicKey);
+  const group = groupOfAddress(address);
   return { address, publicKey, group };
 }
 

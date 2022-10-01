@@ -23,6 +23,8 @@ import {
   SignHexStringResult,
   SignMessageParams,
   SignMessageResult,
+  groupOfAddress,
+  addressFromPublicKey,
 } from "@alephium/web3";
 
 import { getChainsFromNamespaces, getAccountsFromNamespaces } from "@walletconnect/utils";
@@ -368,16 +370,14 @@ export function parseChain(chainString: string): [number, number] {
 }
 
 export function formatAccount(permittedChain: string, account: Account): string {
-  return `${permittedChain}:${account.address}+${account.publicKey}`;
+  return `${permittedChain}:${account.publicKey}`;
 }
 
 export function parseAccount(account: string): Account {
-  const [_namespace, _networkId, group, address, publicKey] = account.replace(/\+|\//g, ":").split(":");
-  return {
-    address: address,
-    publicKey: publicKey,
-    group: +group
-  };
+  const [_namespace, _networkId, _group, publicKey] = account.replace(/\//g, ":").split(":");
+  const address = addressFromPublicKey(publicKey)
+  const group = groupOfAddress(address)
+  return { address, publicKey, group };
 }
 
 export default WalletConnectProvider;

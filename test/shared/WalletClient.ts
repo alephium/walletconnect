@@ -199,7 +199,7 @@ export class WalletClient {
           return group === (chainGroup as number)
         })
         .map((account) =>
-          `${chain}:${account.address}+${account.publicKey}`
+          `${chain}:${account.publicKey}`
         )
     })
   }

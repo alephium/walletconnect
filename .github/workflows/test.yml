@@ -28,7 +28,7 @@ jobs:
           do
             if (( SECONDS > 60 ))
             then
-               echo "Alephium full node not working after 5 mins..."
+               echo "Alephium full node not working after 1 min..."
                exit 1
             fi
             echo "Waiting..."

@@ -114,7 +114,7 @@ class WalletConnectProvider implements SignerProvider {
 
   get permittedChains(): string[] {
     return this.permittedChainsInfo.flatMap((info) => {
-      // Permit all groups if chainGroup is -1
+      // Permit all groups if chainGroup is undefined
       if (info.chainGroup === undefined) {
         return [0, 1, 2, 3].map((group) => formatChain(info.networkId, group));
       }
@@ -377,7 +377,7 @@ export function parseAccount(account: string): Account {
   const [_namespace, _networkId, _group, publicKey] = account.replace(/\//g, ":").split(":");
   const address = addressFromPublicKey(publicKey);
   const group = groupOfAddress(address);
-  return { address, publicKey, group };
+  return { address, group, publicKey };
 }
 
 export default WalletConnectProvider;

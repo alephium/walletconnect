@@ -191,7 +191,7 @@ export class WalletClient {
 
   private chainAccounts(chains: string[]) {
     return chains.flatMap((chain) => {
-      const [networkId, chainGroup] = parseChain(chain)
+      const [_networkId, chainGroup] = parseChain(chain)
 
       return this.accounts
         .filter((account) => {
@@ -224,40 +224,41 @@ export class WalletClient {
         if (typeof this.client === "undefined") throw new Error("Sign Client not inititialized");
         const { id, requiredNamespaces, relays } = proposal.params;
 
-        const namespaces = {};
-        Object.entries(requiredNamespaces).forEach(([key, value]) => {
-          namespaces[key] = {
-            methods: value.methods,
-            events: value.events,
-            accounts: this.chainAccounts(value.chains),
-            extension: value.extension?.map((ext) => ({
-              methods: ext.methods,
-              events: ext.events,
-              accounts: this.chainAccounts(ext.chains)
-            })),
-          };
-        });
+        const requiredAlephiumNamespace = requiredNamespaces[ALEPHIUM_NAMESPACE]
+        if (requiredAlephiumNamespace === undefined) {
+          throw new Error(`${ALEPHIUM_NAMESPACE} namespace is required for session proposal`);
+        }
 
         const requiredChains = requiredNamespaces[ALEPHIUM_NAMESPACE].chains
+        if (requiredChains.length === 0) {
+          throw new Error(`No chain is permitted in ${ALEPHIUM_NAMESPACE} namespace during session proposal`);
+        }
 
         this.permittedChains = requiredChains.map((requiredChain) => {
           const [networkId, chainGroup] = parseChain(requiredChain)
           return formatChain(networkId, chainGroup)
         })
 
-        if (this.permittedChains.length === 0) {
-          throw new Error("No chain is permitted");
+        this.namespace = {
+          methods: requiredAlephiumNamespace.methods,
+          events: requiredAlephiumNamespace.events,
+          accounts: this.chainAccounts(requiredAlephiumNamespace.chains),
+          extension: requiredAlephiumNamespace.extension?.map((ext) => ({
+            methods: ext.methods,
+            events: ext.events,
+            accounts: this.chainAccounts(ext.chains)
+          }))
         }
 
+        const namespaces = { "alephium": this.namespace }
         const { acknowledged } = await this.client.approve({
           id,
           relayProtocol: relays[0].protocol,
-          namespaces,
+          namespaces
         });
-        const session = await acknowledged();
 
+        const session = await acknowledged();
         this.topic = session.topic;
-        this.namespace = namespaces[ALEPHIUM_NAMESPACE]
       },
     );
 

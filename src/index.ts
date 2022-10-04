@@ -106,7 +106,7 @@ export interface WalletConnectProviderOptions {
 class WalletConnectProvider implements SignerProvider {
   public events: any = new EventEmitter();
   public networkId: number;
-  public permittedChainGroups: PermittedChainGroups
+  public permittedChainGroups: PermittedChainGroups;
   public methods = signerMethods;
 
   // Wallet may return accounts from chains not defined in the proposal
@@ -117,8 +117,8 @@ class WalletConnectProvider implements SignerProvider {
 
   get permittedChains(): string[] {
     return Object.entries(this.permittedChainGroups).flatMap(([networkId, chainGroups]) => {
-      return chainGroups.map((chainGroup) => formatChain(+networkId, chainGroup))
-    })
+      return chainGroups.map((chainGroup) => formatChain(+networkId, chainGroup));
+    });
   }
 
   constructor(opts: WalletConnectProviderOptions) {
@@ -127,7 +127,7 @@ class WalletConnectProvider implements SignerProvider {
     }
 
     this.networkId = opts.permittedChains[0].networkId;
-    this.permittedChainGroups = getPermittedChainGroups(opts.permittedChains)
+    this.permittedChainGroups = getPermittedChainGroups(opts.permittedChains);
     this.methods = opts.methods ? [...opts.methods, ...this.methods] : this.methods;
     this.signer = this.setSignerProvider(opts.client);
     this.registerEventListeners();
@@ -306,9 +306,9 @@ class WalletConnectProvider implements SignerProvider {
   private setChain(chains: string[]) {
     if (!this.sameChains(chains, this.chains)) {
       const chainInfos = chains.map((chain) => {
-        const [networkId, chainGroup] = parseChain(chain)
-        return { networkId, chainGroup }
-      })
+        const [networkId, chainGroup] = parseChain(chain);
+        return { networkId, chainGroup };
+      });
 
       this.permittedChainGroups = getPermittedChainGroups(chainInfos);
       this.chains = chains;
@@ -332,10 +332,10 @@ class WalletConnectProvider implements SignerProvider {
       this.lastSetAccounts = parsedAccounts;
     }
 
-    const permittedGroups = this.permittedChainGroups[this.networkId]
+    const permittedGroups = this.permittedChainGroups[this.networkId];
     const newAccounts = parsedAccounts
       .filter(account =>
-        permittedGroups.includes(-1) || permittedGroups.includes(account.group)
+        permittedGroups.includes(-1) || permittedGroups.includes(account.group),
       )
       .filter((value, index, array) =>
         array.findIndex(v => (v.address === value.address)) === index,
@@ -353,10 +353,6 @@ export function isCompatibleChain(chain: string): boolean {
 
 export function formatChain(networkId: number, chainGroup: number): string {
   return `${ALEPHIUM_NAMESPACE}:${networkId}/${chainGroup}`;
-}
-
-export function isCompatibleChainGroup(chainGroup: number, expectedChainGroup: ChainGroup): boolean {
-  return expectedChainGroup === -1 || expectedChainGroup === chainGroup;
 }
 
 export function parseChain(chainString: string): [number, number] {
@@ -383,37 +379,37 @@ export function getPermittedChainGroups(infos: ChainInfo[]): PermittedChainGroup
     acc[networkId] = acc[networkId] || [];
 
     if (acc[networkId].includes(-1)) {
-      return acc
+      return acc;
     }
 
     if (chainGroup === -1) {
-      acc[networkId] = [-1]
+      acc[networkId] = [-1];
     } else if (!acc[networkId].includes(chainGroup)) {
-      acc[networkId].push(chainGroup)
+      acc[networkId].push(chainGroup);
     }
-    return acc
-  }, Object.create({}))
+    return acc;
+  }, Object.create({}));
 }
 
 export function getPermittedChainId(
   networkId: NetworkId,
   chainGroup: ChainGroup,
-  permittedChainGroups?: PermittedChainGroups
+  permittedChainGroups?: PermittedChainGroups,
 ): string | undefined {
-  const chainGroups = permittedChainGroups?.[networkId]
+  const chainGroups = permittedChainGroups?.[networkId];
   if (chainGroups === undefined) {
-    return undefined
+    return undefined;
   }
 
   if (chainGroups.includes(-1)) {
-    return formatChain(networkId, -1)
+    return formatChain(networkId, -1);
   }
 
   if (chainGroups.includes(chainGroup)) {
-    return formatChain(networkId, chainGroup)
+    return formatChain(networkId, chainGroup);
   }
 
-  return undefined
+  return undefined;
 }
 
 export default WalletConnectProvider;

@@ -3,10 +3,10 @@ import { expect } from "chai";
 
 import WalletConnectProvider, {
   formatChain,
-  isCompatibleChainGroup,
   parseChain,
   ChainGroup,
-  getPermittedChainGroups
+  getPermittedChainGroups,
+  getPermittedChainId
 } from "../src/index";
 import { WalletClient } from "./shared";
 import {
@@ -120,18 +120,16 @@ describe("Unit tests", function() {
   const expectedChainGroup0 = 2;
   const expectedChainGroup1 = 1;
 
-  it("test util functions", () => {
+  it("test formatChain & parseChain", () => {
     expect(formatChain(4, expectedChainGroup0)).to.eql("alephium:4/2");
     expect(formatChain(4, expectedChainGroup1)).to.eql("alephium:4/1");
     expect(formatChain(4, -1)).to.eql("alephium:4/-1");
-    expect(isCompatibleChainGroup(2, expectedChainGroup0)).to.eql(true);
-    expect(isCompatibleChainGroup(1, expectedChainGroup0)).to.eql(false);
-    expect(isCompatibleChainGroup(2, -1)).to.eql(true);
-    expect(isCompatibleChainGroup(1, -1)).to.eql(true);
     expect(parseChain("alephium:4/2")).to.eql([4, 2]);
     expect(parseChain("alephium:4/1")).to.eql([4, 1]);
     expect(parseChain("alephium:4/-1")).to.eql([4, -1]);
+  });
 
+  it("test getPermittedChainGroups", () => {
     expect(getPermittedChainGroups([])).to.eql({})
     expect(getPermittedChainGroups([
       { networkId: 4, chainGroup: 1 },
@@ -160,7 +158,15 @@ describe("Unit tests", function() {
       2: [2, 3],
       4: [-1]
     })
+  });
 
+  it("test getPermittedChainId", () => {
+    expect(getPermittedChainId(4, 1, undefined)).to.eql(undefined)
+    expect(getPermittedChainId(4, 1, { 1: [1, 2] })).to.eql(undefined)
+    expect(getPermittedChainId(4, 3, { 1: [1, 2], 4: [1, 2] })).to.eql(undefined)
+    expect(getPermittedChainId(4, 1, { 1: [1, 2], 4: [1, 2, 3] })).to.eql("alephium:4/1")
+    expect(getPermittedChainId(4, 2, { 1: [-1], 4: [1, 2, 3] })).to.eql("alephium:4/2")
+    expect(getPermittedChainId(4, 1, { 1: [1, 2], 4: [-1] })).to.eql("alephium:4/-1")
   });
 });
 

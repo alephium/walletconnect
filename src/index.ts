@@ -44,6 +44,7 @@ export const signerMethods = [
 type SignerMethodsTuple = typeof signerMethods;
 type SignerMethods = SignerMethodsTuple[number];
 
+export type NetworkId = number
 export type ChainGroup = number | undefined
 
 interface SignerMethodsTable extends Record<SignerMethods, { params: any; result: any }> {
@@ -88,9 +89,11 @@ export const PROVIDER_EVENTS = {
 };
 
 export interface ChainInfo {
-  networkId: number;
+  networkId: NetworkId;
   chainGroup: ChainGroup;
 }
+
+type PermittedChainGroups = Record<NetworkId, ChainGroup[]>
 
 export const ALEPHIUM_NAMESPACE = "alephium";
 
@@ -104,6 +107,7 @@ class WalletConnectProvider implements SignerProvider {
   public events: any = new EventEmitter();
   public networkId: number;
   public permittedChainsInfo: ChainInfo[];
+  public permittedChainGroups: PermittedChainGroups
   public methods = signerMethods;
 
   // Wallet may return accounts from chains not defined in the proposal
@@ -129,6 +133,7 @@ class WalletConnectProvider implements SignerProvider {
 
     this.networkId = opts.permittedChains[0].networkId;
     this.permittedChainsInfo = opts.permittedChains;
+    this.permittedChainGroups = mergePermittedChainsInfo(opts.permittedChains)
     this.methods = opts.methods ? [...opts.methods, ...this.methods] : this.methods;
     this.signer = this.setSignerProvider(opts.client);
     this.registerEventListeners();
@@ -378,6 +383,20 @@ export function parseAccount(account: string): Account {
   const address = addressFromPublicKey(publicKey);
   const group = groupOfAddress(address);
   return { address, group, publicKey };
+}
+
+export function mergePermittedChainsInfo(infos: ChainInfo[]): PermittedChainGroups {
+  return infos.reduce((acc, info) => {
+    const networkId = info.networkId;
+    const chainGroup = info.chainGroup || -1;
+    acc[networkId] = acc[networkId] || [];
+    if (chainGroup === -1) {
+      acc[networkId] = [-1]
+    } else if (!acc[networkId].includes(chainGroup)) {
+      acc[networkId].push(chainGroup)
+    }
+    return acc
+  }, Object.create({}))
 }
 
 export default WalletConnectProvider;

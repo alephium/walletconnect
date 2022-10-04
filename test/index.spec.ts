@@ -5,7 +5,8 @@ import WalletConnectProvider, {
   formatChain,
   isCompatibleChainGroup,
   parseChain,
-  ChainGroup
+  ChainGroup,
+  mergePermittedChainsInfo
 } from "../src/index";
 import { WalletClient } from "./shared";
 import {
@@ -130,6 +131,36 @@ describe("Unit tests", function() {
     expect(parseChain("alephium:4/2")).to.eql([4, 2]);
     expect(parseChain("alephium:4/1")).to.eql([4, 1]);
     expect(() => parseChain("alephium:4/-1")).to.throw("chainGroup -1 in chain alephium:4/-1 needs to be positive")
+
+    expect(mergePermittedChainsInfo([])).to.eql({})
+    expect(mergePermittedChainsInfo([
+      { networkId: 4, chainGroup: 1 },
+      { networkId: 4, chainGroup: 2 },
+      { networkId: 4, chainGroup: -1 },
+      { networkId: 1, chainGroup: 1 },
+      { networkId: 1, chainGroup: 2 },
+    ])).to.eql({
+      1: [1, 2],
+      4: [-1]
+    })
+
+    expect(mergePermittedChainsInfo([
+      { networkId: 4, chainGroup: 1 },
+      { networkId: 2, chainGroup: 2 },
+      { networkId: 2, chainGroup: 2 },
+      { networkId: 2, chainGroup: 3 },
+      { networkId: 4, chainGroup: -1 },
+      { networkId: 4, chainGroup: -1 },
+      { networkId: 1, chainGroup: 1 },
+      { networkId: 1, chainGroup: 1 },
+      { networkId: 1, chainGroup: 2 },
+      { networkId: 1, chainGroup: -1 },
+    ])).to.eql({
+      1: [-1],
+      2: [2, 3],
+      4: [-1]
+    })
+
   });
 });
 

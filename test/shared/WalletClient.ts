@@ -18,7 +18,12 @@ import WalletConnectProvider, {
   formatChain,
   formatAccount,
   PROVIDER_EVENTS,
-  ALEPHIUM_NAMESPACE
+  ALEPHIUM_NAMESPACE,
+  PermittedChainGroups,
+  getPermittedChainGroups,
+  ChainGroup,
+  NetworkId,
+  getPermittedChainId
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
 
@@ -45,7 +50,7 @@ export class WalletClient {
   public topic?: string;
 
   public namespace?: SessionTypes.Namespace;
-  public permittedChains?: string[];
+  public permittedChainGroups?: PermittedChainGroups
 
   get currentChain(): string {
     return formatChain(this.networkId, this.group);
@@ -90,20 +95,26 @@ export class WalletClient {
     this.otherSigners = opts.otherPrivateKeys?.map((privateKey) => this.getWallet(privateKey)) ?? []
   }
 
+
   public async changeAccount(privateKey: string) {
     const wallet = this.getWallet(privateKey)
-    const changedChain = formatChain(this.networkId, wallet.group)
-    if (this.permittedChains?.includes(changedChain)) {
-      this.signer = wallet
-      await this.updateAccounts();
-    } else {
-      throw new Error(`Error changing account, chain ${changedChain} not permitted`);
+    const changedChainId = getPermittedChainId(this.networkId, wallet.group, this.permittedChainGroups)
+    if (changedChainId == undefined) {
+      throw new Error(`Error changing account, chain ${formatChain(this.networkId, wallet.group)} not permitted`);
     }
+
+    this.signer = wallet
+    await this.updateAccounts(changedChainId);
   }
 
   public async changeChain(networkId: number, rpcUrl: string) {
+    const changedChainId = getPermittedChainId(networkId, this.group, this.permittedChainGroups)
+    if (changedChainId === undefined) {
+      throw new Error(`Error changing network id ${networkId}, chain ${formatChain(networkId, this.group)} not permitted`)
+    }
+
     this.setNetworkId(networkId, rpcUrl);
-    await this.updateChainId();
+    await this.updateChainId(changedChainId);
   }
 
   public async disconnect() {
@@ -120,11 +131,6 @@ export class WalletClient {
   }
 
   private setNetworkId(networkId: number, rpcUrl: string) {
-    const changedChain = formatChain(networkId, this.group)
-    if (!this.permittedChains?.includes(changedChain)) {
-      throw new Error(`Error changing network id ${networkId}, chain ${changedChain} not permitted`)
-    }
-
     if (this.networkId !== networkId) {
       this.networkId = networkId;
     }
@@ -133,10 +139,9 @@ export class WalletClient {
     }
   }
 
-  private async emitAccountsChangedEvent() {
+  private async emitAccountsChangedEvent(chainId: string) {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
-    const chainId = `alephium:${this.networkId}/${this.group}`
     const event = {
       name: PROVIDER_EVENTS.accountsChanged,
       data: [formatAccount(chainId, this.account)],
@@ -145,14 +150,14 @@ export class WalletClient {
     await this.client.emit({ topic: this.topic, event, chainId });
   }
 
-  private async emitChainChangedEvent() {
+  private async emitChainChangedEvent(chainId: string) {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
     const event = {
       name: PROVIDER_EVENTS.networkChanged,
       data: this.networkId
     }
-    await this.client.emit({ topic: this.topic, event, chainId: this.currentChain });
+    await this.client.emit({ topic: this.topic, event, chainId });
   }
 
   private getWallet(privateKey?: string): PrivateKeyWallet {
@@ -168,20 +173,21 @@ export class WalletClient {
     if (typeof this.topic === "undefined") return;
     if (typeof this.namespace === "undefined") return;
     await this.client.update({
-      topic: this.topic, namespaces: {
+      topic: this.topic,
+      namespaces: {
         "alephium": this.namespace
       }
     });
   }
 
-  private async updateAccounts() {
+  private async updateAccounts(chainId: string) {
     await this.updateSession();
-    await this.emitAccountsChangedEvent();
+    await this.emitAccountsChangedEvent(chainId);
   }
 
-  private async updateChainId() {
+  private async updateChainId(chainId: string) {
     await this.updateSession();
-    await this.emitChainChangedEvent();
+    await this.emitChainChangedEvent(chainId);
   }
 
   private async initialize(opts?: SignClientTypes.Options) {
@@ -196,7 +202,7 @@ export class WalletClient {
       return this.accounts
         .filter((account) => {
           const group = addressToGroup(account.address, 4)
-          return group === (chainGroup as number)
+          return chainGroup === -1 || group === (chainGroup as number)
         })
         .map((account) =>
           `${chain}:${account.publicKey}`
@@ -234,10 +240,11 @@ export class WalletClient {
           throw new Error(`No chain is permitted in ${ALEPHIUM_NAMESPACE} namespace during session proposal`);
         }
 
-        this.permittedChains = requiredChains.map((requiredChain) => {
+        const chainInfos = requiredChains.map((requiredChain) => {
           const [networkId, chainGroup] = parseChain(requiredChain)
-          return formatChain(networkId, chainGroup)
+          return { networkId, chainGroup }
         })
+        this.permittedChainGroups = getPermittedChainGroups(chainInfos)
 
         this.namespace = {
           methods: requiredAlephiumNamespace.methods,

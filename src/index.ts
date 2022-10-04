@@ -45,7 +45,7 @@ type SignerMethodsTuple = typeof signerMethods;
 type SignerMethods = SignerMethodsTuple[number];
 
 export type NetworkId = number
-export type ChainGroup = number | undefined
+export type ChainGroup = number
 
 interface SignerMethodsTable extends Record<SignerMethods, { params: any; result: any }> {
   alph_getAccounts: {
@@ -93,7 +93,7 @@ export interface ChainInfo {
   chainGroup: ChainGroup;
 }
 
-type PermittedChainGroups = Record<NetworkId, ChainGroup[]>
+export type PermittedChainGroups = Record<NetworkId, ChainGroup[]>
 
 export const ALEPHIUM_NAMESPACE = "alephium";
 
@@ -106,7 +106,6 @@ export interface WalletConnectProviderOptions {
 class WalletConnectProvider implements SignerProvider {
   public events: any = new EventEmitter();
   public networkId: number;
-  public permittedChainsInfo: ChainInfo[];
   public permittedChainGroups: PermittedChainGroups
   public methods = signerMethods;
 
@@ -117,13 +116,9 @@ class WalletConnectProvider implements SignerProvider {
   public signer: JsonRpcProvider;
 
   get permittedChains(): string[] {
-    return this.permittedChainsInfo.flatMap((info) => {
-      // Permit all groups if chainGroup is undefined
-      if (info.chainGroup === undefined) {
-        return [0, 1, 2, 3].map((group) => formatChain(info.networkId, group));
-      }
-      return [formatChain(info.networkId, info.chainGroup)];
-    });
+    return Object.entries(this.permittedChainGroups).flatMap(([networkId, chainGroups]) => {
+      return chainGroups.map((chainGroup) => formatChain(+networkId, chainGroup))
+    })
   }
 
   constructor(opts: WalletConnectProviderOptions) {
@@ -132,8 +127,7 @@ class WalletConnectProvider implements SignerProvider {
     }
 
     this.networkId = opts.permittedChains[0].networkId;
-    this.permittedChainsInfo = opts.permittedChains;
-    this.permittedChainGroups = mergePermittedChainsInfo(opts.permittedChains)
+    this.permittedChainGroups = getPermittedChainGroups(opts.permittedChains)
     this.methods = opts.methods ? [...opts.methods, ...this.methods] : this.methods;
     this.signer = this.setSignerProvider(opts.client);
     this.registerEventListeners();
@@ -311,6 +305,12 @@ class WalletConnectProvider implements SignerProvider {
 
   private setChain(chains: string[]) {
     if (!this.sameChains(chains, this.chains)) {
+      const chainInfos = chains.map((chain) => {
+        const [networkId, chainGroup] = parseChain(chain)
+        return { networkId, chainGroup }
+      })
+
+      this.permittedChainGroups = getPermittedChainGroups(chainInfos);
       this.chains = chains;
     }
   }
@@ -332,14 +332,14 @@ class WalletConnectProvider implements SignerProvider {
       this.lastSetAccounts = parsedAccounts;
     }
 
+    const permittedGroups = this.permittedChainGroups[this.networkId]
     const newAccounts = parsedAccounts
       .filter(account =>
-        this.chains.includes(formatChain(this.networkId, account.group)),
+        permittedGroups.includes(-1) || permittedGroups.includes(account.group)
       )
       .filter((value, index, array) =>
         array.findIndex(v => (v.address === value.address)) === index,
       );
-
     if (newAccounts.length !== 0 && !this.sameAccounts(newAccounts, this.accounts)) {
       this.accounts = newAccounts;
       this.events.emit(PROVIDER_EVENTS.accountsChanged, newAccounts);
@@ -352,25 +352,16 @@ export function isCompatibleChain(chain: string): boolean {
 }
 
 export function formatChain(networkId: number, chainGroup: number): string {
-  if (chainGroup < 0) {
-    throw new Error(`chainGroup ${chainGroup} needs to be positive`);
-  }
-
   return `${ALEPHIUM_NAMESPACE}:${networkId}/${chainGroup}`;
 }
 
 export function isCompatibleChainGroup(chainGroup: number, expectedChainGroup: ChainGroup): boolean {
-  return expectedChainGroup === undefined || expectedChainGroup === chainGroup;
+  return expectedChainGroup === -1 || expectedChainGroup === chainGroup;
 }
 
 export function parseChain(chainString: string): [number, number] {
   const [_namespace, networkId, chainGroup] = chainString.replace(/\//g, ":").split(":");
   const chainGroupDecoded = parseInt(chainGroup, 10);
-
-  if (chainGroupDecoded < 0) {
-    throw new Error(`chainGroup ${chainGroup} in chain ${chainString} needs to be positive`);
-  }
-
   return [parseInt(networkId, 10), chainGroupDecoded];
 }
 
@@ -385,11 +376,16 @@ export function parseAccount(account: string): Account {
   return { address, group, publicKey };
 }
 
-export function mergePermittedChainsInfo(infos: ChainInfo[]): PermittedChainGroups {
+export function getPermittedChainGroups(infos: ChainInfo[]): PermittedChainGroups {
   return infos.reduce((acc, info) => {
     const networkId = info.networkId;
-    const chainGroup = info.chainGroup || -1;
+    const chainGroup = info.chainGroup;
     acc[networkId] = acc[networkId] || [];
+
+    if (acc[networkId].includes(-1)) {
+      return acc
+    }
+
     if (chainGroup === -1) {
       acc[networkId] = [-1]
     } else if (!acc[networkId].includes(chainGroup)) {
@@ -397,6 +393,27 @@ export function mergePermittedChainsInfo(infos: ChainInfo[]): PermittedChainGrou
     }
     return acc
   }, Object.create({}))
+}
+
+export function getPermittedChainId(
+  networkId: NetworkId,
+  chainGroup: ChainGroup,
+  permittedChainGroups?: PermittedChainGroups
+): string | undefined {
+  const chainGroups = permittedChainGroups?.[networkId]
+  if (chainGroups === undefined) {
+    return undefined
+  }
+
+  if (chainGroups.includes(-1)) {
+    return formatChain(networkId, -1)
+  }
+
+  if (chainGroups.includes(chainGroup)) {
+    return formatChain(networkId, chainGroup)
+  }
+
+  return undefined
 }
 
 export default WalletConnectProvider;

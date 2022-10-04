@@ -6,7 +6,7 @@ import WalletConnectProvider, {
   isCompatibleChainGroup,
   parseChain,
   ChainGroup,
-  mergePermittedChainsInfo
+  getPermittedChainGroups
 } from "../src/index";
 import { WalletClient } from "./shared";
 import {
@@ -123,17 +123,17 @@ describe("Unit tests", function() {
   it("test util functions", () => {
     expect(formatChain(4, expectedChainGroup0)).to.eql("alephium:4/2");
     expect(formatChain(4, expectedChainGroup1)).to.eql("alephium:4/1");
-    expect(() => formatChain(4, -1)).to.throw("chainGroup -1 needs to be positive")
+    expect(formatChain(4, -1)).to.eql("alephium:4/-1");
     expect(isCompatibleChainGroup(2, expectedChainGroup0)).to.eql(true);
     expect(isCompatibleChainGroup(1, expectedChainGroup0)).to.eql(false);
-    expect(isCompatibleChainGroup(2, undefined)).to.eql(true);
-    expect(isCompatibleChainGroup(1, undefined)).to.eql(true);
+    expect(isCompatibleChainGroup(2, -1)).to.eql(true);
+    expect(isCompatibleChainGroup(1, -1)).to.eql(true);
     expect(parseChain("alephium:4/2")).to.eql([4, 2]);
     expect(parseChain("alephium:4/1")).to.eql([4, 1]);
-    expect(() => parseChain("alephium:4/-1")).to.throw("chainGroup -1 in chain alephium:4/-1 needs to be positive")
+    expect(parseChain("alephium:4/-1")).to.eql([4, -1]);
 
-    expect(mergePermittedChainsInfo([])).to.eql({})
-    expect(mergePermittedChainsInfo([
+    expect(getPermittedChainGroups([])).to.eql({})
+    expect(getPermittedChainGroups([
       { networkId: 4, chainGroup: 1 },
       { networkId: 4, chainGroup: 2 },
       { networkId: 4, chainGroup: -1 },
@@ -144,12 +144,12 @@ describe("Unit tests", function() {
       4: [-1]
     })
 
-    expect(mergePermittedChainsInfo([
+    expect(getPermittedChainGroups([
+      { networkId: 4, chainGroup: -1 },
       { networkId: 4, chainGroup: 1 },
       { networkId: 2, chainGroup: 2 },
       { networkId: 2, chainGroup: 2 },
       { networkId: 2, chainGroup: 3 },
-      { networkId: 4, chainGroup: -1 },
       { networkId: 4, chainGroup: -1 },
       { networkId: 1, chainGroup: 1 },
       { networkId: 1, chainGroup: 1 },
@@ -196,8 +196,8 @@ describe("WalletConnectProvider with single chainGroup", function() {
     expect(walletAddress).to.eql(ACCOUNTS.a.address);
     const providerAccounts = await provider.connect();
     expect(provider.chains).to.eql([
-      "alephium:4/0",
       "alephium:1/0",
+      "alephium:4/0",
       "alephium:4/2"
     ])
     expect(providerAccounts.map(a => a.address)).to.eql([
@@ -328,11 +328,11 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
       permittedChains: [
         {
           networkId: NETWORK_ID,
-          chainGroup: undefined
+          chainGroup: -1
         },
         {
           networkId: 1,
-          chainGroup: undefined
+          chainGroup: -1
         }
       ],
       client: signClient,
@@ -343,14 +343,8 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
     expect(walletAddress).to.eql(ACCOUNTS.a.address);
     const providerAccounts = await provider.connect();
     expect(provider.chains).to.eql([
-      "alephium:4/0",
-      "alephium:4/1",
-      "alephium:4/2",
-      "alephium:4/3",
-      "alephium:1/0",
-      "alephium:1/1",
-      "alephium:1/2",
-      "alephium:1/3"
+      "alephium:1/-1",
+      "alephium:4/-1"
     ])
     expect(providerAccounts.map(a => a.address)).to.eql([
       signerA.address,

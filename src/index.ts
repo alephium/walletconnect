@@ -150,7 +150,11 @@ class WalletConnectProvider implements SignerProvider {
         throw new Error(`Unknown signer address ${args.params.signerAddress}`);
       }
       return this.signer.request(args, {
-        chainId: formatChain(this.networkId, signerAccount.group),
+        chainId: getPermittedChainId(
+          this.networkId,
+          signerAccount.group,
+          this.permittedChainGroups,
+        ),
       });
     }
     return Promise.reject(new Error(`Invalid method was passed ${args.method}`));

@@ -21,8 +21,6 @@ import WalletConnectProvider, {
   ALEPHIUM_NAMESPACE,
   PermittedChainGroups,
   getPermittedChainGroups,
-  ChainGroup,
-  NetworkId,
   getPermittedChainId
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
@@ -51,10 +49,6 @@ export class WalletClient {
 
   public namespace?: SessionTypes.Namespace;
   public permittedChainGroups?: PermittedChainGroups
-
-  get currentChain(): string {
-    return formatChain(this.networkId, this.group);
-  }
 
   static async init(
     provider: WalletConnectProvider,
@@ -278,21 +272,17 @@ export class WalletClient {
         }
 
         const { topic, params, id } = requestEvent;
-        const { chainId, request } = params;
 
         // ignore if unmatched topic
         if (topic !== this.topic) return;
 
-        try {
-          // reject if no present target chain
-          if (typeof chainId === "undefined") {
-            throw new Error("Missing target chain");
-          }
+        const { chainId, request } = params;
+        const [networkId, chainGroup] = parseChain(chainId)
 
-          // reject if unmatched chain
-          if (this.currentChain != chainId) {
+        try {
+          if (getPermittedChainId(networkId, chainGroup, this.permittedChainGroups) === undefined) {
             throw new Error(
-              `Target chain (${chainId}) does not match current chain (${this.currentChain})`,
+              `Target chain (${chainId}) does not match current chain`,
             );
           }
 

@@ -116,7 +116,7 @@ class WalletConnectProvider extends SignerProvider {
 
   public signer: JsonRpcProvider;
 
-  public getSelectedAccount(): Promise<Account> {
+  public get selectedAccountPromise(): Promise<Account> {
     if (this.account === undefined) {
       throw Error("There is no selected account.");
     }
@@ -199,8 +199,8 @@ class WalletConnectProvider extends SignerProvider {
     return this.request({ method, params });
   }
 
-  public getAccounts(): Promise<Account[]> {
-    return this.typedRequest("alph_getAccounts", undefined);
+  public getSelectedAccount(): Promise<Account> {
+    return this.typedRequest("alph_getSelectedAccount", undefined);
   }
 
   public async signTransferTx(params: SignTransferTxParams): Promise<SignTransferTxResult> {
@@ -286,7 +286,7 @@ class WalletConnectProvider extends SignerProvider {
         alephium: {
           chains: [this.permittedChain],
           methods: this.methods,
-          events: ["accountsChanged"],
+          events: ["accountChanged"],
         },
       },
     });
@@ -336,7 +336,7 @@ class WalletConnectProvider extends SignerProvider {
     }
 
     const newAccount = parsedAccounts[0];
-    if (!isCompatibleChainGroup(newAccount, this.chainGroup)) {
+    if (!isCompatibleChainGroup(newAccount.group, this.chainGroup)) {
       throw Error(`The new account belongs to an unexpected chain group`);
     }
 
@@ -349,8 +349,17 @@ export function isCompatibleChain(chain: string): boolean {
   return chain.startsWith(`${ALEPHIUM_NAMESPACE}:`);
 }
 
-export function isCompatibleChainGroup(account: Account, expectedChainGroup?: ChainGroup): boolean {
-  return expectedChainGroup === undefined || expectedChainGroup === account.group;
+export function isCompatibleWithPermittedGroups(group: ChainGroup, permittedGroups: ChainGroup[]): boolean {
+  for (const permittedGroup of permittedGroups) {
+    if (isCompatibleChainGroup(group, permittedGroup)) {
+      return true
+    }
+  }
+  return false
+}
+
+export function isCompatibleChainGroup(group: ChainGroup, expectedChainGroup?: ChainGroup): boolean {
+  return expectedChainGroup === undefined || expectedChainGroup === group;
 }
 
 export function formatChain(networkId: number, chainGroup: ChainGroup): string {
@@ -379,6 +388,25 @@ export function parseAccount(account: string): Account {
   const address = addressFromPublicKey(publicKey);
   const group = groupOfAddress(address);
   return { address, group, publicKey };
+}
+
+export function getPermittedChainGroups(infos: ChainInfo[]): Record<NetworkId, ChainGroup[]> {
+  return infos.reduce((acc, info) => {
+    const networkId = info.networkId;
+    const chainGroup = info.chainGroup;
+    acc[networkId] = acc[networkId] || [];
+
+    if (acc[networkId].includes(undefined)) {
+      return acc;
+    }
+
+    if (chainGroup === -1) {
+      acc[networkId] = [undefined];
+    } else if (!acc[networkId].includes(chainGroup)) {
+      acc[networkId].push(chainGroup);
+    }
+    return acc;
+  }, Object.create({}));
 }
 
 export default WalletConnectProvider;

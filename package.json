@@ -31,8 +31,8 @@
     "lint": "eslint -c '.eslintrc' --fix './src/**/*.ts'"
   },
   "dependencies": {
-    "@alephium/web3": "0.2.0-rc.27",
-    "@alephium/web3-wallet": "0.2.0-rc.27",
+    "@alephium/web3": "0.2.0-rc.33",
+    "@alephium/web3-wallet": "0.2.0-rc.33",
     "@walletconnect/jsonrpc-http-connection": "^1.0.3",
     "@walletconnect/jsonrpc-provider": "^1.0.5",
     "@walletconnect/jsonrpc-types": "^1.0.1",

@@ -123,10 +123,12 @@ describe("Unit tests", function() {
   it("test formatChain & parseChain", () => {
     expect(formatChain(4, expectedChainGroup0)).to.eql("alephium:4/2");
     expect(formatChain(4, expectedChainGroup1)).to.eql("alephium:4/1");
-    expect(formatChain(4, -1)).to.eql("alephium:4/-1");
+    expect(formatChain(4, undefined)).to.eql("alephium:4/-1");
+    expect(() => formatChain(4, -1)).to.throw();
     expect(parseChain("alephium:4/2")).to.eql([4, 2]);
     expect(parseChain("alephium:4/1")).to.eql([4, 1]);
-    expect(parseChain("alephium:4/-1")).to.eql([4, -1]);
+    expect(parseChain("alephium:4/-1")).to.eql([4, undefined]);
+    expect(() => parseChain("alephium:4/-2")).to.throw();
   });
 
   it("test getPermittedChainGroups", () => {
@@ -134,7 +136,7 @@ describe("Unit tests", function() {
     expect(getPermittedChainGroups([
       { networkId: 4, chainGroup: 1 },
       { networkId: 4, chainGroup: 2 },
-      { networkId: 4, chainGroup: -1 },
+      { networkId: 4, chainGroup: undefined },
       { networkId: 1, chainGroup: 1 },
       { networkId: 1, chainGroup: 2 },
     ])).to.eql({

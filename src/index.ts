@@ -97,7 +97,7 @@ export const ALEPHIUM_NAMESPACE = "alephium";
 
 export interface WalletConnectProviderOptions {
   networkId: number;
-  chainGroup: number;
+  chainGroup: ChainGroup;
   nodeUrl?: string;
   nodeApiKey?: string;
   methods?: string[];

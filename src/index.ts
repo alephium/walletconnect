@@ -390,7 +390,12 @@ export function parseAccount(account: string): Account {
   return { address, group, publicKey };
 }
 
-export function getPermittedChainGroups(infos: ChainInfo[]): Record<NetworkId, ChainGroup[]> {
+export function getPermittedChainGroups(chains: string[]): Record<NetworkId, ChainGroup[]> {
+  const infos = chains.map((chain) => {
+    const [networkId, chainGroup] = parseChain(chain)
+    return { networkId, chainGroup }
+  })
+
   return infos.reduce((acc, info) => {
     const networkId = info.networkId;
     const chainGroup = info.chainGroup;
@@ -400,7 +405,7 @@ export function getPermittedChainGroups(infos: ChainInfo[]): Record<NetworkId, C
       return acc;
     }
 
-    if (chainGroup === -1) {
+    if (chainGroup === undefined) {
       acc[networkId] = [undefined];
     } else if (!acc[networkId].includes(chainGroup)) {
       acc[networkId].push(chainGroup);

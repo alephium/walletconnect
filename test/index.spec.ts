@@ -3,6 +3,7 @@ import { expect } from "chai";
 
 import WalletConnectProvider, {
   formatChain,
+  getPermittedChainGroups,
   parseChain,
 } from "../src/index";
 import { WalletClient } from "./shared";
@@ -124,6 +125,36 @@ describe("Unit tests", function() {
     expect(parseChain("alephium:4/1")).to.eql([4, 1]);
     expect(parseChain("alephium:4/-1")).to.eql([4, undefined]);
     expect(() => parseChain("alephium:4/-2")).to.throw();
+  });
+
+  it("test getPermittedChainGroups", () => {
+    expect(getPermittedChainGroups([])).to.eql({})
+    expect(getPermittedChainGroups([
+      "alephium/4:1",
+      "alephium/4:2",
+      "alephium/4:-1",
+      "alephium/1:1",
+      "alephium/1:2",
+    ])).to.eql({
+      1: [1, 2],
+      4: [undefined]
+    })
+    expect(getPermittedChainGroups([
+      "alephium/4:-1",
+      "alephium/4:1",
+      "alephium/2:2",
+      "alephium/2:2",
+      "alephium/2:3",
+      "alephium/4:-1",
+      "alephium/1:1",
+      "alephium/1:1",
+      "alephium/1:2",
+      "alephium/1:-1",
+    ])).to.eql({
+      1: [undefined],
+      2: [2, 3],
+      4: [undefined]
+    })
   });
 });
 

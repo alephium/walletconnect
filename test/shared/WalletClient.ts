@@ -234,12 +234,7 @@ export class WalletClient {
           throw new Error(`No chain is permitted in ${ALEPHIUM_NAMESPACE} namespace during session proposal`);
         }
 
-        const chainInfos = requiredChains.map((requiredChain) => {
-          const [networkId, chainGroup] = parseChain(requiredChain)
-          return { networkId, chainGroup }
-        })
-
-        const permittedChainGroups = getPermittedChainGroups(chainInfos)
+        const permittedChainGroups = getPermittedChainGroups(requiredChains)
         const networks = Object.keys(permittedChainGroups)
         if (networks.length !== 1) {
           throw Error(`WC Provider can only propose session with single networks, but ${networks} are detected`)

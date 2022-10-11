@@ -19,9 +19,8 @@ import WalletConnectProvider, {
   formatAccount,
   PROVIDER_EVENTS,
   ALEPHIUM_NAMESPACE,
-  PermittedChainGroups,
-  getPermittedChainGroups,
-  getPermittedChainId
+  ChainGroup,
+  isCompatibleChainGroup,
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
 
@@ -48,7 +47,7 @@ export class WalletClient {
   public topic?: string;
 
   public namespace?: SessionTypes.Namespace;
-  public permittedChainGroups?: PermittedChainGroups
+  public permittedChainGroup: ChainGroup
 
   static async init(
     provider: WalletConnectProvider,
@@ -84,17 +83,23 @@ export class WalletClient {
     this.networkId = opts?.networkId || 4;
     this.rpcUrl = opts?.rpcUrl || "http://alephium:22973";
     this.submitTx = opts?.submitTx || false;
+    this.permittedChainGroup = undefined;
     this.nodeProvider = new NodeProvider(this.rpcUrl);
     this.signer = this.getWallet(opts.activePrivateKey);
     this.otherSigners = opts.otherPrivateKeys?.map((privateKey) => this.getWallet(privateKey)) ?? []
   }
 
-
   public async changeAccount(privateKey: string) {
     const wallet = this.getWallet(privateKey)
-    const changedChainId = getPermittedChainId(this.networkId, wallet.group, this.permittedChainGroups)
-    if (changedChainId == undefined) {
-      throw new Error(`Error changing account, chain ${formatChain(this.networkId, wallet.group)} not permitted`);
+    let changedChainId: string
+    if (this.permittedChainGroup === undefined) {
+      changedChainId = formatChain(this.networkId, undefined)
+    } else {
+      changedChainId = formatChain(this.networkId, wallet.group)
+    }
+
+    if (!isCompatibleChainGroup(wallet.account.group, this.permittedChainGroup)) {
+      throw new Error(`Error changing account, chain ${changedChainId} not permitted`);
     }
 
     this.signer = wallet
@@ -102,13 +107,12 @@ export class WalletClient {
   }
 
   public async changeChain(networkId: number, rpcUrl: string) {
-    const changedChainId = getPermittedChainId(networkId, this.group, this.permittedChainGroups)
-    if (changedChainId === undefined) {
-      throw new Error(`Error changing network id ${networkId}, chain ${formatChain(networkId, this.group)} not permitted`)
+    if (this.networkId === networkId) {
+      return
     }
 
     this.setNetworkId(networkId, rpcUrl);
-    await this.updateChainId(changedChainId);
+    this.disconnect()
   }
 
   public async disconnect() {
@@ -137,20 +141,10 @@ export class WalletClient {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
     const event = {
-      name: PROVIDER_EVENTS.accountsChanged,
+      name: PROVIDER_EVENTS.accountChanged,
       data: [formatAccount(chainId, this.account)],
     };
 
-    await this.client.emit({ topic: this.topic, event, chainId });
-  }
-
-  private async emitChainChangedEvent(chainId: string) {
-    if (typeof this.client === "undefined") return;
-    if (typeof this.topic === "undefined") return;
-    const event = {
-      name: PROVIDER_EVENTS.networkChanged,
-      data: this.networkId
-    }
     await this.client.emit({ topic: this.topic, event, chainId });
   }
 
@@ -162,26 +156,25 @@ export class WalletClient {
     return wallet;
   }
 
-  private async updateSession() {
+  private async updateSession(chainId: string) {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
     if (typeof this.namespace === "undefined") return;
+
     await this.client.update({
       topic: this.topic,
       namespaces: {
-        "alephium": this.namespace
+        "alephium": {
+          ...this.namespace,
+          accounts: [`${chainId}:${this.account.publicKey}`]
+        }
       }
     });
   }
 
   private async updateAccounts(chainId: string) {
-    await this.updateSession();
+    await this.updateSession(chainId);
     await this.emitAccountsChangedEvent(chainId);
-  }
-
-  private async updateChainId(chainId: string) {
-    await this.updateSession();
-    await this.emitChainChangedEvent(chainId);
   }
 
   private async initialize(opts?: SignClientTypes.Options) {
@@ -189,19 +182,28 @@ export class WalletClient {
     this.registerEventListeners();
   }
 
-  private chainAccounts(chains: string[]) {
-    return chains.flatMap((chain) => {
+  private chainAccount(chains: string[]) {
+    const accounts = chains.flatMap((chain) => {
       const [_networkId, chainGroup] = parseChain(chain)
 
-      return this.accounts
+      const accounts = this.accounts
         .filter((account) => {
           const group = addressToGroup(account.address, 4)
-          return chainGroup === -1 || group === (chainGroup as number)
+          return chainGroup === undefined || group === (chainGroup as number)
         })
         .map((account) =>
           `${chain}:${account.publicKey}`
         )
+
+      return accounts
     })
+
+    // Get the first one
+    if (accounts.length === 0) {
+      throw new Error("WC Client has no account to return")
+    }
+
+    return accounts[0]
   }
 
   private registerEventListeners() {
@@ -230,25 +232,19 @@ export class WalletClient {
         }
 
         const requiredChains = requiredNamespaces[ALEPHIUM_NAMESPACE].chains
-        if (requiredChains.length === 0) {
-          throw new Error(`No chain is permitted in ${ALEPHIUM_NAMESPACE} namespace during session proposal`);
+        if (requiredChains.length !== 1) {
+          throw new Error(`Only single chain is allowed in ${ALEPHIUM_NAMESPACE} namespace during session proposal, proposed chains: ${requiredChains}`);
         }
 
-        const chainInfos = requiredChains.map((requiredChain) => {
-          const [networkId, chainGroup] = parseChain(requiredChain)
-          return { networkId, chainGroup }
-        })
-        this.permittedChainGroups = getPermittedChainGroups(chainInfos)
+        const requiredChain = requiredChains[0]
+        const [networkId, permittedChainGroup] = parseChain(requiredChain)
+        this.networkId = networkId
+        this.permittedChainGroup = permittedChainGroup
 
         this.namespace = {
           methods: requiredAlephiumNamespace.methods,
           events: requiredAlephiumNamespace.events,
-          accounts: this.chainAccounts(requiredAlephiumNamespace.chains),
-          extension: requiredAlephiumNamespace.extension?.map((ext) => ({
-            methods: ext.methods,
-            events: ext.events,
-            accounts: this.chainAccounts(ext.chains)
-          }))
+          accounts: [this.chainAccount(requiredAlephiumNamespace.chains)]
         }
 
         const namespaces = { "alephium": this.namespace }
@@ -280,9 +276,9 @@ export class WalletClient {
         const [networkId, chainGroup] = parseChain(chainId)
 
         try {
-          if (getPermittedChainId(networkId, chainGroup, this.permittedChainGroups) === undefined) {
+          if (!(networkId === this.networkId && isCompatibleChainGroup(chainGroup, this.permittedChainGroup))) {
             throw new Error(
-              `Target chain (${chainId}) does not match current chain`,
+              `Target chain(${chainId}) is not permitted`,
             );
           }
 
@@ -294,13 +290,28 @@ export class WalletClient {
                 (request.params as any) as SignTransferTxParams,
               );
               break;
-            case "alph_signContractCreationTx":
+            case "alph_signAndSubmitTransferTx":
+              result = await this.signer.signAndSubmitTransferTx(
+                (request.params as any) as SignTransferTxParams,
+              );
+              break;
+            case "alph_signDeployContractTx":
               result = await this.signer.signDeployContractTx(
                 (request.params as any) as SignDeployContractTxParams,
               );
               break;
-            case "alph_signScriptTx":
+            case "alph_signAndSubmitDeployContractTx":
+              result = await this.signer.signAndSubmitDeployContractTx(
+                (request.params as any) as SignDeployContractTxParams,
+              );
+              break;
+            case "alph_signExecuteScriptTx":
               result = await this.signer.signExecuteScriptTx(
+                (request.params as any) as SignExecuteScriptTxParams,
+              );
+              break;
+            case "alph_signAndSubmitExecuteScriptTx":
+              result = await this.signer.signAndSubmitExecuteScriptTx(
                 (request.params as any) as SignExecuteScriptTxParams,
               );
               break;

@@ -1,4 +1,5 @@
 Contract Greeter(btcPrice: U256) {
+    @using(readonly = true)
     pub fn greet() -> U256 {
         return btcPrice
     }

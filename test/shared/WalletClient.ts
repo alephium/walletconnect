@@ -157,7 +157,7 @@ export class WalletClient {
     return wallet;
   }
 
-  private async updateSession() {
+  private async updateSession(chainId: string) {
     if (typeof this.client === "undefined") return;
     if (typeof this.topic === "undefined") return;
     if (typeof this.namespace === "undefined") return;
@@ -165,13 +165,16 @@ export class WalletClient {
     await this.client.update({
       topic: this.topic,
       namespaces: {
-        "alephium": this.namespace
+        "alephium": {
+          ...this.namespace,
+          accounts: [`${chainId}:${this.account.publicKey}`]
+        }
       }
     });
   }
 
   private async updateAccounts(chainId: string) {
-    await this.updateSession();
+    await this.updateSession(chainId);
     await this.emitAccountsChangedEvent(chainId);
   }
 
@@ -246,12 +249,7 @@ export class WalletClient {
         this.namespace = {
           methods: requiredAlephiumNamespace.methods,
           events: requiredAlephiumNamespace.events,
-          accounts: [this.chainAccount(requiredAlephiumNamespace.chains)],
-          extension: requiredAlephiumNamespace.extension?.map((ext) => ({
-            methods: ext.methods,
-            events: ext.events,
-            accounts: [this.chainAccount(ext.chains)]
-          }))
+          accounts: [this.chainAccount(requiredAlephiumNamespace.chains)]
         }
 
         const namespaces = { "alephium": this.namespace }
@@ -297,13 +295,28 @@ export class WalletClient {
                 (request.params as any) as SignTransferTxParams,
               );
               break;
+            case "alph_signAndSubmitTransferTx":
+              result = await this.signer.signAndSubmitTransferTx(
+                (request.params as any) as SignTransferTxParams,
+              );
+              break;
             case "alph_signContractCreationTx":
               result = await this.signer.signDeployContractTx(
                 (request.params as any) as SignDeployContractTxParams,
               );
               break;
+            case "alph_signAndSubmitContractCreationTx":
+              result = await this.signer.signAndSubmitDeployContractTx(
+                (request.params as any) as SignDeployContractTxParams,
+              );
+              break;
             case "alph_signScriptTx":
               result = await this.signer.signExecuteScriptTx(
+                (request.params as any) as SignExecuteScriptTxParams,
+              );
+              break;
+            case "alph_signAndSubmitScriptTx":
+              result = await this.signer.signAndSubmitExecuteScriptTx(
                 (request.params as any) as SignExecuteScriptTxParams,
               );
               break;

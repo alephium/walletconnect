@@ -35,8 +35,11 @@ import { getChainsFromNamespaces, getAccountsFromNamespaces } from "@walletconne
 export const signerMethods = [
   "alph_getSelectedAccount",
   "alph_signTransferTx",
+  "alph_signAndSubmitTransferTx",
   "alph_signContractCreationTx",
+  "alph_signAndSubmitDeployContractTx",
   "alph_signScriptTx",
+  "alph_signAndSubmitExecuteScriptTx",
   "alph_signUnsignedTx",
   "alph_signHexString",
   "alph_signMessage",

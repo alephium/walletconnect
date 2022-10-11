@@ -374,15 +374,6 @@ export function isCompatibleChain(chain: string): boolean {
   return chain.startsWith(`${ALEPHIUM_NAMESPACE}:`);
 }
 
-export function isCompatibleWithPermittedGroups(group: ChainGroup, permittedGroups: ChainGroup[]): boolean {
-  for (const permittedGroup of permittedGroups) {
-    if (isCompatibleChainGroup(group, permittedGroup)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export function isCompatibleChainGroup(group: ChainGroup, expectedChainGroup?: ChainGroup): boolean {
   return expectedChainGroup === undefined || expectedChainGroup === group;
 }
@@ -413,30 +404,6 @@ export function parseAccount(account: string): Account {
   const address = addressFromPublicKey(publicKey);
   const group = groupOfAddress(address);
   return { address, group, publicKey };
-}
-
-export function getPermittedChainGroups(chains: string[]): Record<NetworkId, ChainGroup[]> {
-  const infos = chains.map((chain) => {
-    const [networkId, chainGroup] = parseChain(chain)
-    return { networkId, chainGroup }
-  })
-
-  return infos.reduce((acc, info) => {
-    const networkId = info.networkId;
-    const chainGroup = info.chainGroup;
-    acc[networkId] = acc[networkId] || [];
-
-    if (acc[networkId].includes(undefined)) {
-      return acc;
-    }
-
-    if (chainGroup === undefined) {
-      acc[networkId] = [undefined];
-    } else if (!acc[networkId].includes(chainGroup)) {
-      acc[networkId].push(chainGroup);
-    }
-    return acc;
-  }, Object.create({}));
 }
 
 export default WalletConnectProvider;

@@ -20,8 +20,7 @@ import WalletConnectProvider, {
   PROVIDER_EVENTS,
   ALEPHIUM_NAMESPACE,
   ChainGroup,
-  isCompatibleWithPermittedGroups,
-  getPermittedChainGroups,
+  isCompatibleChainGroup,
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
 
@@ -48,7 +47,7 @@ export class WalletClient {
   public topic?: string;
 
   public namespace?: SessionTypes.Namespace;
-  public permittedGroups: ChainGroup[]
+  public permittedChainGroup: ChainGroup
 
   static async init(
     provider: WalletConnectProvider,
@@ -84,7 +83,7 @@ export class WalletClient {
     this.networkId = opts?.networkId || 4;
     this.rpcUrl = opts?.rpcUrl || "http://alephium:22973";
     this.submitTx = opts?.submitTx || false;
-    this.permittedGroups = [];
+    this.permittedChainGroup = undefined;
     this.nodeProvider = new NodeProvider(this.rpcUrl);
     this.signer = this.getWallet(opts.activePrivateKey);
     this.otherSigners = opts.otherPrivateKeys?.map((privateKey) => this.getWallet(privateKey)) ?? []
@@ -93,13 +92,13 @@ export class WalletClient {
   public async changeAccount(privateKey: string) {
     const wallet = this.getWallet(privateKey)
     let changedChainId: string
-    if (this.permittedGroups.includes(undefined)) {
+    if (this.permittedChainGroup === undefined) {
       changedChainId = formatChain(this.networkId, undefined)
     } else {
       changedChainId = formatChain(this.networkId, wallet.group)
     }
 
-    if (!isCompatibleWithPermittedGroups(wallet.account.group, this.permittedGroups)) {
+    if (!isCompatibleChainGroup(wallet.account.group, this.permittedChainGroup)) {
       throw new Error(`Error changing account, chain ${changedChainId} not permitted`);
     }
 
@@ -233,18 +232,14 @@ export class WalletClient {
         }
 
         const requiredChains = requiredNamespaces[ALEPHIUM_NAMESPACE].chains
-        if (requiredChains.length === 0) {
-          throw new Error(`No chain is permitted in ${ALEPHIUM_NAMESPACE} namespace during session proposal`);
+        if (requiredChains.length !== 1) {
+          throw new Error(`Only single chain is allowed in ${ALEPHIUM_NAMESPACE} namespace during session proposal, proposed chains: ${requiredChains}`);
         }
 
-        const permittedChainGroups = getPermittedChainGroups(requiredChains)
-        const networks = Object.keys(permittedChainGroups)
-        if (networks.length !== 1) {
-          throw Error(`WC Provider can only propose session with single networks, but ${networks} are detected`)
-        }
-
-        this.networkId = parseInt(networks[0], 10)
-        this.permittedGroups = permittedChainGroups[networks[0]]
+        const requiredChain = requiredChains[0]
+        const [networkId, permittedChainGroup] = parseChain(requiredChain)
+        this.networkId = networkId
+        this.permittedChainGroup = permittedChainGroup
 
         this.namespace = {
           methods: requiredAlephiumNamespace.methods,
@@ -281,7 +276,7 @@ export class WalletClient {
         const [networkId, chainGroup] = parseChain(chainId)
 
         try {
-          if (!(networkId === this.networkId && isCompatibleWithPermittedGroups(chainGroup, this.permittedGroups))) {
+          if (!(networkId === this.networkId && isCompatibleChainGroup(chainGroup, this.permittedChainGroup))) {
             throw new Error(
               `Target chain(${chainId}) is not permitted`,
             );

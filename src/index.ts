@@ -132,13 +132,6 @@ class WalletConnectProvider extends SignerProvider {
 
   public signer: JsonRpcProvider;
 
-  public get selectedAccountPromise(): Promise<Account> {
-    if (this.account === undefined) {
-      throw Error("There is no selected account.");
-    }
-    return Promise.resolve(this.account);
-  }
-
   private get permittedChain(): string {
     return formatChain(this.networkId, this.chainGroup);
   }
@@ -158,7 +151,7 @@ class WalletConnectProvider extends SignerProvider {
   // The provider only supports signer methods. The other requests should use Alephium Rest API.
   public async request<T = unknown>(args: RequestArguments): Promise<T> {
     if (args.method === "alph_getSelectedAccount") {
-      return this.account as any;
+      return Promise.resolve(this.account as T);
     }
     if (this.methods.includes(args.method)) {
       const signerAddress = args.params?.signerAddress;
@@ -384,10 +377,10 @@ export function isCompatibleChain(chain: string): boolean {
 export function isCompatibleWithPermittedGroups(group: ChainGroup, permittedGroups: ChainGroup[]): boolean {
   for (const permittedGroup of permittedGroups) {
     if (isCompatibleChainGroup(group, permittedGroup)) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 export function isCompatibleChainGroup(group: ChainGroup, expectedChainGroup?: ChainGroup): boolean {

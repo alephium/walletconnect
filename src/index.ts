@@ -25,6 +25,7 @@ import {
   groupOfAddress,
   addressFromPublicKey,
   NodeProvider,
+  SubmissionResult,
 } from "@alephium/web3";
 
 import { getChainsFromNamespaces, getAccountsFromNamespaces } from "@walletconnect/utils";
@@ -36,9 +37,9 @@ export const signerMethods = [
   "alph_getSelectedAccount",
   "alph_signTransferTx",
   "alph_signAndSubmitTransferTx",
-  "alph_signContractCreationTx",
+  "alph_signDeployContractTx",
   "alph_signAndSubmitDeployContractTx",
-  "alph_signScriptTx",
+  "alph_signExecuteScriptTx",
   "alph_signAndSubmitExecuteScriptTx",
   "alph_signUnsignedTx",
   "alph_signHexString",
@@ -59,13 +60,25 @@ interface SignerMethodsTable extends Record<SignerMethods, { params: any; result
     params: SignTransferTxParams;
     result: SignTransferTxResult;
   };
-  alph_signContractCreationTx: {
+  alph_signAndSubmitTransferTx: {
+    params: SignTransferTxParams;
+    result: SubmissionResult
+  };
+  alph_signDeployContractTx: {
     params: SignDeployContractTxParams;
     result: SignDeployContractTxResult;
   };
-  alph_signScriptTx: {
+  alph_signAndSubmitDeployContractTx: {
+    params: SignDeployContractTxParams;
+    result: SubmissionResult
+  };
+  alph_signExecuteScriptTx: {
     params: SignExecuteScriptTxParams;
     result: SignExecuteScriptTxResult;
+  };
+  alph_signAndSubmitExecuteScriptTx: {
+    params: SignExecuteScriptTxParams;
+    result: SubmissionResult
   };
   alph_signUnsignedTx: {
     params: SignUnsignedTxParams;
@@ -210,16 +223,32 @@ class WalletConnectProvider extends SignerProvider {
     return this.typedRequest("alph_signTransferTx", params);
   }
 
+  public async signAndSubmitTransferTx(params: SignTransferTxParams): Promise<SubmissionResult> {
+    return this.typedRequest("alph_signAndSubmitTransferTx", params);
+  }
+
   public async signDeployContractTx(
     params: SignDeployContractTxParams,
   ): Promise<SignDeployContractTxResult> {
-    return this.typedRequest("alph_signContractCreationTx", params);
+    return this.typedRequest("alph_signDeployContractTx", params);
+  }
+
+  public async signAndSubmitDeployContractTx(
+    params: SignDeployContractTxParams,
+  ): Promise<SubmissionResult> {
+    return this.typedRequest("alph_signAndSubmitDeployContractTx", params);
   }
 
   public async signExecuteScriptTx(
     params: SignExecuteScriptTxParams,
   ): Promise<SignExecuteScriptTxResult> {
-    return this.typedRequest("alph_signScriptTx", params);
+    return this.typedRequest("alph_signExecuteScriptTx", params);
+  }
+
+  public async signAndSubmitExecuteScriptTx(
+    params: SignExecuteScriptTxParams,
+  ): Promise<SubmissionResult> {
+    return this.typedRequest("alph_signAndSubmitExecuteScriptTx", params);
   }
 
   public async signUnsignedTx(params: SignUnsignedTxParams): Promise<SignUnsignedTxResult> {

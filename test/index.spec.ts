@@ -79,11 +79,7 @@ const TEST_PROVIDER_OPTS = {
   logger: "error",
   networkId: NETWORK_ID,
   chainGroup: CHAIN_GROUP,
-  rpc: {
-    custom: {
-      [NETWORK_ID]: RPC_URL,
-    },
-  },
+  nodeUrl: RPC_URL,
   relayUrl: TEST_RELAY_URL,
   metadata: TEST_APP_METADATA,
 };
@@ -269,6 +265,9 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
     // change to account c
     await verifyAccountsChange(ACCOUNTS.c.privateKey, ACCOUNTS.c.address, provider, walletClient)
 
+    // change to account b
+    await verifyAccountsChange(ACCOUNTS.b.privateKey, ACCOUNTS.b.address, provider, walletClient)
+
     // change back to account a
     await verifyAccountsChange(ACCOUNTS.a.privateKey, ACCOUNTS.a.address, provider, walletClient)
   });
@@ -339,7 +338,7 @@ async function verifySign(
   expect(balance.utxoNum).to.eql(1);
   expect(walletClient.submitTx).to.be.true;
 
-  await provider.signTransferTx({
+  await provider.signAndSubmitTransferTx({
     signerAddress: signerA.address,
     destinations: [{ address: ACCOUNTS.b.address, attoAlphAmount: ONE_ALPH }],
   });
@@ -351,8 +350,8 @@ async function verifySign(
     signerAddress: signerA.address,
     initialFields: { btcPrice: 1 },
   });
-  const greeterResult = await signerA.signDeployContractTx(greeterParams);
-  await signerA.submitTransaction(greeterResult.unsignedTx, greeterResult.signature);
+  const greeterResult = await provider.signDeployContractTx(greeterParams);
+  await provider.submitTransaction(greeterResult.unsignedTx, greeterResult.signature);
   await checkBalanceDecreasing();
 
   const main = Project.script("Main");
@@ -360,16 +359,16 @@ async function verifySign(
     signerAddress: signerA.address,
     initialFields: { greeterContractId: greeterResult.contractId },
   });
-  await signerA.signAndSubmitExecuteScriptTx(mainParams);
+  await provider.signAndSubmitExecuteScriptTx(mainParams);
   await checkBalanceDecreasing();
 
   const hexString = "48656c6c6f20416c65706869756d21";
-  const signedHexString = await signerA.signHexString({
+  const signedHexString = await provider.signHexString({
     hexString: hexString,
     signerAddress: signerA.address,
   });
   const message = "Hello Alephium!";
-  const signedMessage = await signerA.signMessage({
+  const signedMessage = await provider.signMessage({
     message: message,
     signerAddress: signerA.address,
   });

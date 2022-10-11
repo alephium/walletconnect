@@ -300,22 +300,22 @@ export class WalletClient {
                 (request.params as any) as SignTransferTxParams,
               );
               break;
-            case "alph_signContractCreationTx":
+            case "alph_signDeployContractTx":
               result = await this.signer.signDeployContractTx(
                 (request.params as any) as SignDeployContractTxParams,
               );
               break;
-            case "alph_signAndSubmitContractCreationTx":
+            case "alph_signAndSubmitDeployContractTx":
               result = await this.signer.signAndSubmitDeployContractTx(
                 (request.params as any) as SignDeployContractTxParams,
               );
               break;
-            case "alph_signScriptTx":
+            case "alph_signExecuteScriptTx":
               result = await this.signer.signExecuteScriptTx(
                 (request.params as any) as SignExecuteScriptTxParams,
               );
               break;
-            case "alph_signAndSubmitScriptTx":
+            case "alph_signAndSubmitExecuteScriptTx":
               result = await this.signer.signAndSubmitExecuteScriptTx(
                 (request.params as any) as SignExecuteScriptTxParams,
               );

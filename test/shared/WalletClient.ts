@@ -1,15 +1,15 @@
 import { SessionTypes, SignClientTypes } from "@walletconnect/types";
-import { formatJsonRpcError, formatJsonRpcResult } from "@walletconnect/jsonrpc-utils";
+import { formatJsonRpcError, formatJsonRpcResult, RequestArguments } from "@walletconnect/jsonrpc-utils";
 import {
   NodeProvider,
   SignTransferTxParams,
   SignDeployContractTxParams,
   SignExecuteScriptTxParams,
   SignUnsignedTxParams,
-  SignHexStringParams,
   SignMessageParams,
   Account,
   addressToGroup,
+  ApiRequestArguments,
 } from "@alephium/web3";
 import { PrivateKeyWallet } from "@alephium/web3-wallet";
 
@@ -21,6 +21,7 @@ import WalletConnectProvider, {
   ALEPHIUM_NAMESPACE,
   ChainGroup,
   isCompatibleChainGroup,
+  SignerMethods,
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
 
@@ -164,7 +165,7 @@ export class WalletClient {
     await this.client.update({
       topic: this.topic,
       namespaces: {
-        "alephium": {
+        alephium: {
           ...this.namespace,
           accounts: [`${chainId}:${this.account.publicKey}`]
         }
@@ -247,7 +248,7 @@ export class WalletClient {
           accounts: [this.chainAccount(requiredAlephiumNamespace.chains)]
         }
 
-        const namespaces = { "alephium": this.namespace }
+        const namespaces = { alephium: this.namespace }
         const { acknowledged } = await this.client.approve({
           id,
           relayProtocol: relays[0].protocol,
@@ -284,20 +285,10 @@ export class WalletClient {
 
           let result: any;
 
-          switch (request.method) {
-            case "alph_signTransferTx":
-              result = await this.signer.signTransferTx(
-                (request.params as any) as SignTransferTxParams,
-              );
-              break;
+          switch (request.method as SignerMethods) {
             case "alph_signAndSubmitTransferTx":
               result = await this.signer.signAndSubmitTransferTx(
                 (request.params as any) as SignTransferTxParams,
-              );
-              break;
-            case "alph_signDeployContractTx":
-              result = await this.signer.signDeployContractTx(
-                (request.params as any) as SignDeployContractTxParams,
               );
               break;
             case "alph_signAndSubmitDeployContractTx":
@@ -305,14 +296,14 @@ export class WalletClient {
                 (request.params as any) as SignDeployContractTxParams,
               );
               break;
-            case "alph_signExecuteScriptTx":
-              result = await this.signer.signExecuteScriptTx(
-                (request.params as any) as SignExecuteScriptTxParams,
-              );
-              break;
             case "alph_signAndSubmitExecuteScriptTx":
               result = await this.signer.signAndSubmitExecuteScriptTx(
                 (request.params as any) as SignExecuteScriptTxParams,
+              );
+              break;
+            case "alph_signAndSubmitUnsignedTx":
+              result = await this.signer.signAndSubmitUnsignedTx(
+                (request.params as any) as SignUnsignedTxParams,
               );
               break;
             case "alph_signUnsignedTx":
@@ -320,16 +311,14 @@ export class WalletClient {
                 (request.params as any) as SignUnsignedTxParams,
               );
               break;
-            case "alph_signHexString":
-              result = await this.signer.signHexString(
-                (request.params as any) as SignHexStringParams,
-              );
-              break;
             case "alph_signMessage":
               result = await this.signer.signMessage((request.params as any) as SignMessageParams);
               break;
+            case "alph_requestNodeApi":
+              result = await this.nodeProvider.request((request.params as ApiRequestArguments));
+              break;
             default:
-              throw new Error(`Method not supported: ${request.method}`);
+              throw new Error(`Method is not supported: ${request.method}`);
           }
 
           // reject if undefined result

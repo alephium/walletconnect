@@ -10,7 +10,6 @@ import {
   web3,
   node,
   NodeProvider,
-  verifyHexString,
   verifySignedMessage,
   Project,
 } from "@alephium/web3";
@@ -54,7 +53,7 @@ const ACCOUNTS = {
   }
 };
 
-const ONE_ALPH = "1000000000000000000";
+const ONE_ALPH = 10n ** 18n;
 
 const TEST_RELAY_URL = process.env.TEST_RELAY_URL
   ? process.env.TEST_RELAY_URL
@@ -121,6 +120,15 @@ describe("Unit tests", function() {
     expect(parseChain("alephium:4/-1")).to.eql([4, undefined]);
     expect(() => parseChain("alephium:4/-2")).to.throw();
   });
+
+  it('should initialize providers', () => {
+    const provider0 = new WalletConnectProvider(TEST_PROVIDER_OPTS);
+    expect(provider0.nodeProvider !== undefined).to.equal(true);
+    expect(provider0.explorerProvider !== undefined).to.equal(true);
+    const provider1 = new WalletConnectProvider({ ...TEST_PROVIDER_OPTS, methods: [] });
+    expect(provider1.nodeProvider === undefined).to.equal(true);
+    expect(provider1.explorerProvider === undefined).to.equal(true);
+  })
 });
 
 describe("WalletConnectProvider with single chainGroup", function() {
@@ -161,6 +169,10 @@ describe("WalletConnectProvider with single chainGroup", function() {
     expect(walletClient.client?.session.values.length).to.eql(0);
     expect(provider.connected).to.be.false;
   });
+
+  it("should forward requests", async () => {
+    await provider.nodeProvider!.infos.getInfosVersion();
+  })
 
   it("accountChanged", async () => {
     // change to account within the same group
@@ -315,34 +327,22 @@ async function verifySign(
   await checkBalanceDecreasing();
   const greeter = Project.contract("Greeter");
 
-  const greeterParams = await greeter.paramsForDeployment({
-    signerAddress: signerA.address,
-    initialFields: { btcPrice: 1 },
+  const greeterResult = await greeter.deploy(provider, {
+    initialFields: { btcPrice: 1n },
   });
-  const greeterResult = await provider.signDeployContractTx(greeterParams);
-  await provider.submitTransaction(greeterResult.unsignedTx, greeterResult.signature);
   await checkBalanceDecreasing();
 
   const main = Project.script("Main");
-  const mainParams = await main.paramsForDeployment({
-    signerAddress: signerA.address,
+  await main.execute(provider, {
     initialFields: { greeterContractId: greeterResult.contractId },
   });
-  await provider.signAndSubmitExecuteScriptTx(mainParams);
   await checkBalanceDecreasing();
 
-  const hexString = "48656c6c6f20416c65706869756d21";
-  const signedHexString = await provider.signHexString({
-    hexString: hexString,
-    signerAddress: signerA.address,
-  });
   const message = "Hello Alephium!";
   const signedMessage = await provider.signMessage({
     message: message,
     signerAddress: signerA.address,
   });
-  expect(signedMessage.signature).not.to.eql(signedHexString.signature);
-  expect(verifyHexString(hexString, signerA.publicKey, signedHexString.signature)).to.be.true;
   expect(verifySignedMessage(message, signerA.publicKey, signedMessage.signature)).to.be.true;
 }
 

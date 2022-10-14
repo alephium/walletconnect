@@ -18,14 +18,13 @@ import {
   SignExecuteScriptTxResult,
   SignUnsignedTxParams,
   SignUnsignedTxResult,
-  SignHexStringParams,
-  SignHexStringResult,
   SignMessageParams,
   SignMessageResult,
   groupOfAddress,
   addressFromPublicKey,
   NodeProvider,
-  SubmissionResult,
+  ExplorerProvider,
+  ApiRequestArguments
 } from "@alephium/web3";
 
 import { getChainsFromNamespaces, getAccountsFromNamespaces } from "@walletconnect/utils";
@@ -35,66 +34,58 @@ import { getChainsFromNamespaces, getAccountsFromNamespaces } from "@walletconne
 // 2. `alph_signUnsignedTx` can be used for complicated transactions (e.g. multisig).
 export const signerMethods = [
   "alph_getSelectedAccount",
-  "alph_signTransferTx",
   "alph_signAndSubmitTransferTx",
-  "alph_signDeployContractTx",
   "alph_signAndSubmitDeployContractTx",
-  "alph_signExecuteScriptTx",
   "alph_signAndSubmitExecuteScriptTx",
+  "alph_signAndSubmitUnsignedTx",
   "alph_signUnsignedTx",
-  "alph_signHexString",
   "alph_signMessage",
-];
+  "alph_requestNodeApi",
+  "alph_requestExplorerApi"
+] as const;
 type SignerMethodsTuple = typeof signerMethods;
-type SignerMethods = SignerMethodsTuple[number];
-
-export type NetworkId = number
-export type ChainGroup = number | undefined
+export type SignerMethods = SignerMethodsTuple[number];
 
 interface SignerMethodsTable extends Record<SignerMethods, { params: any; result: any }> {
   alph_getSelectedAccount: {
     params: undefined;
     result: Account;
   };
-  alph_signTransferTx: {
-    params: SignTransferTxParams;
-    result: SignTransferTxResult;
-  };
   alph_signAndSubmitTransferTx: {
     params: SignTransferTxParams;
-    result: SubmissionResult
-  };
-  alph_signDeployContractTx: {
-    params: SignDeployContractTxParams;
-    result: SignDeployContractTxResult;
+    result: SignTransferTxResult
   };
   alph_signAndSubmitDeployContractTx: {
     params: SignDeployContractTxParams;
-    result: SubmissionResult
-  };
-  alph_signExecuteScriptTx: {
-    params: SignExecuteScriptTxParams;
-    result: SignExecuteScriptTxResult;
+    result: SignDeployContractTxResult
   };
   alph_signAndSubmitExecuteScriptTx: {
     params: SignExecuteScriptTxParams;
-    result: SubmissionResult
+    result: SignExecuteScriptTxResult
+  };
+  alph_signAndSubmitUnsignedTx: {
+    params: SignUnsignedTxParams;
+    result: SignUnsignedTxResult
   };
   alph_signUnsignedTx: {
     params: SignUnsignedTxParams;
     result: SignUnsignedTxResult;
   };
-  alph_signHexString: {
-    params: SignHexStringParams;
-    result: SignHexStringResult;
-  };
   alph_signMessage: {
     params: SignMessageParams;
     result: SignMessageResult;
   };
+  alph_requestNodeApi: {
+    params: ApiRequestArguments;
+    result: any
+  };
+  alph_requestExplorerApi: {
+    params: ApiRequestArguments;
+    result: any
+  }
 }
-export type MethodParams<T extends SignerMethods> = SignerMethodsTable[T]["params"];
-export type MethodResult<T extends SignerMethods> = SignerMethodsTable[T]["result"];
+type MethodParams<T extends SignerMethods> = SignerMethodsTable[T]["params"];
+type MethodResult<T extends SignerMethods> = SignerMethodsTable[T]["result"];
 
 export const PROVIDER_EVENTS = {
   connect: "connect",
@@ -104,6 +95,8 @@ export const PROVIDER_EVENTS = {
   accountChanged: "accountChanged",
 };
 
+export type NetworkId = number
+export type ChainGroup = number | undefined
 export interface ChainInfo {
   networkId: NetworkId;
   chainGroup: ChainGroup;
@@ -114,19 +107,18 @@ export const ALEPHIUM_NAMESPACE = "alephium";
 export interface WalletConnectProviderOptions {
   networkId: number;
   chainGroup: ChainGroup;
-  nodeUrl?: string;
-  nodeApiKey?: string;
   methods?: string[];
   client?: SignerConnectionClientOpts;
 }
 
-class WalletConnectProvider extends SignerProvider {
+class WalletConnectProvider implements SignerProvider {
   public events: any = new EventEmitter();
-  public nodeProvider: NodeProvider | undefined = undefined;
+  public nodeProvider: NodeProvider | undefined;
+  public explorerProvider: ExplorerProvider | undefined;
 
   public networkId: number;
   public chainGroup: ChainGroup;
-  public methods = signerMethods;
+  public methods: string[];
 
   public account: Account | undefined = undefined;
 
@@ -137,13 +129,21 @@ class WalletConnectProvider extends SignerProvider {
   }
 
   constructor(opts: WalletConnectProviderOptions) {
-    super();
-
     this.networkId = opts.networkId;
     this.chainGroup = opts.chainGroup;
-    this.nodeProvider = opts.nodeUrl === undefined ? undefined : new NodeProvider(opts.nodeUrl, opts.nodeApiKey);
 
-    this.methods = opts.methods ? [...opts.methods, ...this.methods] : this.methods;
+    this.methods = opts.methods ?? [...signerMethods];
+    if (this.methods.includes("alph_requestNodeApi")) {
+      this.nodeProvider = NodeProvider.Remote(this.requestNodeAPI);
+    } else {
+      this.nodeProvider = undefined;
+    }
+    if (this.methods.includes("alph_requestNodeApi")) {
+      this.explorerProvider = ExplorerProvider.Remote(this.requestExplorerAPI);
+    } else {
+      this.explorerProvider = undefined;
+    }
+
     this.signer = this.setSignerProvider(opts.client);
     this.registerEventListeners();
   }
@@ -153,7 +153,12 @@ class WalletConnectProvider extends SignerProvider {
     if (args.method === "alph_getSelectedAccount") {
       return Promise.resolve(this.account as T);
     }
-    if (this.methods.includes(args.method)) {
+
+    if (!this.methods.includes(args.method)) {
+      return Promise.reject(new Error(`Invalid method was passed ${args.method}`));
+    }
+
+    if (!args.method.startsWith("alph_request")) {
       const signerAddress = args.params?.signerAddress;
       if (typeof signerAddress === "undefined") {
         throw new Error("Cannot request without signerAddress");
@@ -162,9 +167,9 @@ class WalletConnectProvider extends SignerProvider {
       if (signerAddress !== selectedAccount.address) {
         throw new Error(`Invalid signer address ${args.params.signerAddress}`);
       }
-      return this.signer.request(args, { chainId: this.permittedChain });
     }
-    return Promise.reject(new Error(`Invalid method was passed ${args.method}`));
+
+    return this.signer.request(args, { chainId: this.permittedChain });
   }
 
   public async connect(): Promise<void> {
@@ -208,56 +213,44 @@ class WalletConnectProvider extends SignerProvider {
     return this.request({ method, params });
   }
 
+  private requestNodeAPI = (args: ApiRequestArguments): Promise<any> => {
+    return this.typedRequest("alph_requestNodeApi", args);
+  }
+
+  private requestExplorerAPI = (args: ApiRequestArguments): Promise<any> => {
+    return this.typedRequest("alph_requestExplorerApi", args);
+  }
+
   public getSelectedAccount(): Promise<Account> {
     return this.typedRequest("alph_getSelectedAccount", undefined);
   }
 
-  public async signTransferTx(params: SignTransferTxParams): Promise<SignTransferTxResult> {
-    return this.typedRequest("alph_signTransferTx", params);
-  }
-
-  public async signAndSubmitTransferTx(params: SignTransferTxParams): Promise<SubmissionResult> {
+  public async signAndSubmitTransferTx(params: SignTransferTxParams): Promise<SignTransferTxResult> {
     return this.typedRequest("alph_signAndSubmitTransferTx", params);
-  }
-
-  public async signDeployContractTx(
-    params: SignDeployContractTxParams,
-  ): Promise<SignDeployContractTxResult> {
-    return this.typedRequest("alph_signDeployContractTx", params);
   }
 
   public async signAndSubmitDeployContractTx(
     params: SignDeployContractTxParams,
-  ): Promise<SubmissionResult> {
+  ): Promise<SignDeployContractTxResult> {
     return this.typedRequest("alph_signAndSubmitDeployContractTx", params);
-  }
-
-  public async signExecuteScriptTx(
-    params: SignExecuteScriptTxParams,
-  ): Promise<SignExecuteScriptTxResult> {
-    return this.typedRequest("alph_signExecuteScriptTx", params);
   }
 
   public async signAndSubmitExecuteScriptTx(
     params: SignExecuteScriptTxParams,
-  ): Promise<SubmissionResult> {
+  ): Promise<SignExecuteScriptTxResult> {
     return this.typedRequest("alph_signAndSubmitExecuteScriptTx", params);
+  }
+
+  public async signAndSubmitUnsignedTx(params: SignUnsignedTxParams): Promise<SignUnsignedTxResult> {
+    return this.typedRequest("alph_signAndSubmitUnsignedTx", params);
   }
 
   public async signUnsignedTx(params: SignUnsignedTxParams): Promise<SignUnsignedTxResult> {
     return this.typedRequest("alph_signUnsignedTx", params);
   }
 
-  public async signHexString(params: SignHexStringParams): Promise<SignHexStringResult> {
-    return this.typedRequest("alph_signHexString", params);
-  }
-
   public async signMessage(params: SignMessageParams): Promise<SignMessageResult> {
     return this.typedRequest("alph_signMessage", params);
-  }
-
-  public async signRaw(signerAddress: string, hexString: string): Promise<string> {
-    throw Error("Function `signRaw` is not supported");
   }
 
   // ---------- Private ----------------------------------------------- //

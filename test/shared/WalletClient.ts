@@ -18,10 +18,10 @@ import WalletConnectProvider, {
   formatChain,
   formatAccount,
   PROVIDER_EVENTS,
-  ALEPHIUM_NAMESPACE,
+  PROVIDER_NAMESPACE,
   ChainGroup,
   isCompatibleChainGroup,
-  SignerMethods,
+  ProviderMethod,
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
 
@@ -227,14 +227,14 @@ export class WalletClient {
         if (typeof this.client === "undefined") throw new Error("Sign Client not inititialized");
         const { id, requiredNamespaces, relays } = proposal.params;
 
-        const requiredAlephiumNamespace = requiredNamespaces[ALEPHIUM_NAMESPACE]
+        const requiredAlephiumNamespace = requiredNamespaces[PROVIDER_NAMESPACE]
         if (requiredAlephiumNamespace === undefined) {
-          throw new Error(`${ALEPHIUM_NAMESPACE} namespace is required for session proposal`);
+          throw new Error(`${PROVIDER_NAMESPACE} namespace is required for session proposal`);
         }
 
-        const requiredChains = requiredNamespaces[ALEPHIUM_NAMESPACE].chains
+        const requiredChains = requiredNamespaces[PROVIDER_NAMESPACE].chains
         if (requiredChains.length !== 1) {
-          throw new Error(`Only single chain is allowed in ${ALEPHIUM_NAMESPACE} namespace during session proposal, proposed chains: ${requiredChains}`);
+          throw new Error(`Only single chain is allowed in ${PROVIDER_NAMESPACE} namespace during session proposal, proposed chains: ${requiredChains}`);
         }
 
         const requiredChain = requiredChains[0]
@@ -285,7 +285,7 @@ export class WalletClient {
 
           let result: any;
 
-          switch (request.method as SignerMethods) {
+          switch (request.method as ProviderMethod) {
             case "alph_signAndSubmitTransferTx":
               result = await this.signer.signAndSubmitTransferTx(
                 (request.params as any) as SignTransferTxParams,

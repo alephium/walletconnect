@@ -32,7 +32,7 @@ import { getChainsFromNamespaces, getAccountsFromNamespaces } from "@walletconne
 // Note:
 // 1. the wallet client could potentially submit the signed transaction.
 // 2. `alph_signUnsignedTx` can be used for complicated transactions (e.g. multisig).
-export const signerMethods = [
+export const PROVIDER_METHODS = [
   "alph_getSelectedAccount",
   "alph_signAndSubmitTransferTx",
   "alph_signAndSubmitDeployContractTx",
@@ -43,10 +43,10 @@ export const signerMethods = [
   "alph_requestNodeApi",
   "alph_requestExplorerApi"
 ] as const;
-type SignerMethodsTuple = typeof signerMethods;
-export type SignerMethods = SignerMethodsTuple[number];
+type ProviderMethodsTuple = typeof PROVIDER_METHODS;
+export type ProviderMethod = ProviderMethodsTuple[number];
 
-interface SignerMethodsTable extends Record<SignerMethods, { params: any; result: any }> {
+interface ProviderMethodsTable extends Record<ProviderMethod, { params: any; result: any }> {
   alph_getSelectedAccount: {
     params: undefined;
     result: Account;
@@ -84,8 +84,8 @@ interface SignerMethodsTable extends Record<SignerMethods, { params: any; result
     result: any
   }
 }
-type MethodParams<T extends SignerMethods> = SignerMethodsTable[T]["params"];
-type MethodResult<T extends SignerMethods> = SignerMethodsTable[T]["result"];
+type MethodParams<T extends ProviderMethod> = ProviderMethodsTable[T]["params"];
+type MethodResult<T extends ProviderMethod> = ProviderMethodsTable[T]["result"];
 
 export const PROVIDER_EVENTS = {
   connect: "connect",
@@ -102,12 +102,12 @@ export interface ChainInfo {
   chainGroup: ChainGroup;
 }
 
-export const ALEPHIUM_NAMESPACE = "alephium";
+export const PROVIDER_NAMESPACE = "alephium";
 
 export interface WalletConnectProviderOptions {
   networkId: number;
   chainGroup: ChainGroup;
-  methods?: string[];
+  methods?: ProviderMethod[];
   client?: SignerConnectionClientOpts;
 }
 
@@ -118,7 +118,7 @@ class WalletConnectProvider implements SignerProvider {
 
   public networkId: number;
   public chainGroup: ChainGroup;
-  public methods: string[];
+  public methods: ProviderMethod[];
 
   public account: Account | undefined = undefined;
 
@@ -132,7 +132,7 @@ class WalletConnectProvider implements SignerProvider {
     this.networkId = opts.networkId;
     this.chainGroup = opts.chainGroup;
 
-    this.methods = opts.methods ?? [...signerMethods];
+    this.methods = opts.methods ?? [...PROVIDER_METHODS];
     if (this.methods.includes("alph_requestNodeApi")) {
       this.nodeProvider = NodeProvider.Remote(this.requestNodeAPI);
     } else {
@@ -154,7 +154,7 @@ class WalletConnectProvider implements SignerProvider {
       return Promise.resolve(this.account as T);
     }
 
-    if (!this.methods.includes(args.method)) {
+    if (!(this.methods as string[]).includes(args.method)) {
       return Promise.reject(new Error(`Invalid method was passed ${args.method}`));
     }
 
@@ -206,7 +206,7 @@ class WalletConnectProvider implements SignerProvider {
 
   // ---------- Methods ----------------------------------------------- //
 
-  private typedRequest<T extends SignerMethods>(
+  private typedRequest<T extends ProviderMethod>(
     method: T,
     params: MethodParams<T>
   ): Promise<MethodResult<T>> {
@@ -312,9 +312,9 @@ class WalletConnectProvider implements SignerProvider {
   }
 
   private updateNamespace(session: SessionTypes.Struct) {
-    const chains = getChainsFromNamespaces(session.namespaces, [ALEPHIUM_NAMESPACE]);
+    const chains = getChainsFromNamespaces(session.namespaces, [PROVIDER_NAMESPACE]);
     this.setChain(chains);
-    const accounts = getAccountsFromNamespaces(session.namespaces, [ALEPHIUM_NAMESPACE]);
+    const accounts = getAccountsFromNamespaces(session.namespaces, [PROVIDER_NAMESPACE]);
     this.setAccounts(accounts);
   }
 
@@ -364,7 +364,7 @@ class WalletConnectProvider implements SignerProvider {
 }
 
 export function isCompatibleChain(chain: string): boolean {
-  return chain.startsWith(`${ALEPHIUM_NAMESPACE}:`);
+  return chain.startsWith(`${PROVIDER_NAMESPACE}:`);
 }
 
 export function isCompatibleChainGroup(group: ChainGroup, expectedChainGroup?: ChainGroup): boolean {
@@ -376,7 +376,7 @@ export function formatChain(networkId: number, chainGroup: ChainGroup): string {
     throw Error("Chain group in provider needs to be either undefined or non-negative");
   }
   const chainGroupEncoded = chainGroup !== undefined ? chainGroup : -1;
-  return `${ALEPHIUM_NAMESPACE}:${networkId}/${chainGroupEncoded}`;
+  return `${PROVIDER_NAMESPACE}:${networkId}/${chainGroupEncoded}`;
 }
 
 export function parseChain(chainString: string): [NetworkId, ChainGroup] {

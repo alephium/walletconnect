@@ -22,76 +22,8 @@ import {
 
 import { getChainsFromNamespaces, getAccountsFromNamespaces, getSdkError } from "@walletconnect/utils";
 import SignClient from "@walletconnect/sign-client";
-import { LOGGER, RELAY_URL } from "./constants";
-
-// Note:
-// 1. the wallet client could potentially submit the signed transaction.
-// 2. `alph_signUnsignedTx` can be used for complicated transactions (e.g. multisig).
-export const PROVIDER_METHODS = [
-  "alph_getSelectedAccount",
-  "alph_signAndSubmitTransferTx",
-  "alph_signAndSubmitDeployContractTx",
-  "alph_signAndSubmitExecuteScriptTx",
-  "alph_signAndSubmitUnsignedTx",
-  "alph_signUnsignedTx",
-  "alph_signMessage",
-  "alph_requestNodeApi",
-  "alph_requestExplorerApi"
-] as const;
-type ProviderMethodsTuple = typeof PROVIDER_METHODS;
-export type ProviderMethod = ProviderMethodsTuple[number];
-
-interface ProviderMethodsTable extends Record<ProviderMethod, { params: any; result: any }> {
-  alph_getSelectedAccount: {
-    params: undefined;
-    result: Account;
-  };
-  alph_signAndSubmitTransferTx: {
-    params: SignTransferTxParams;
-    result: SignTransferTxResult
-  };
-  alph_signAndSubmitDeployContractTx: {
-    params: SignDeployContractTxParams;
-    result: SignDeployContractTxResult
-  };
-  alph_signAndSubmitExecuteScriptTx: {
-    params: SignExecuteScriptTxParams;
-    result: SignExecuteScriptTxResult
-  };
-  alph_signAndSubmitUnsignedTx: {
-    params: SignUnsignedTxParams;
-    result: SignUnsignedTxResult
-  };
-  alph_signUnsignedTx: {
-    params: SignUnsignedTxParams;
-    result: SignUnsignedTxResult;
-  };
-  alph_signMessage: {
-    params: SignMessageParams;
-    result: SignMessageResult;
-  };
-  alph_requestNodeApi: {
-    params: ApiRequestArguments;
-    result: any
-  };
-  alph_requestExplorerApi: {
-    params: ApiRequestArguments;
-    result: any
-  }
-}
-type MethodParams<T extends ProviderMethod> = ProviderMethodsTable[T]["params"];
-type MethodResult<T extends ProviderMethod> = ProviderMethodsTable[T]["result"];
-
-export type ProviderEvent = "session_ping" | "session_update" | "session_delete" | "session_event" | "displayUri" | "accountChanged";
-
-export type NetworkId = number
-export type ChainGroup = number | undefined
-export interface ChainInfo {
-  networkId: NetworkId;
-  chainGroup: ChainGroup;
-}
-
-export const PROVIDER_NAMESPACE = "alephium";
+import { LOGGER, PROVIDER_NAMESPACE, RELAY_METHODS, RELAY_URL } from "./constants";
+import { ChainGroup, MethodParams, MethodResult, NetworkId, ProviderEvent, ProviderMethod } from "./types";
 
 export interface ProviderOptions {
   // Alephium options
@@ -136,7 +68,7 @@ class WalletConnectProvider implements SignerProvider {
     this.chainGroup = opts.chainGroup;
     this.permittedChain = formatChain(this.networkId, this.chainGroup);
 
-    this.methods = opts.methods ?? [...PROVIDER_METHODS.slice(1)];
+    this.methods = opts.methods ?? RELAY_METHODS;
     if (this.methods.includes("alph_requestNodeApi")) {
       this.nodeProvider = NodeProvider.Remote(this.requestNodeAPI);
     } else {
@@ -283,7 +215,6 @@ class WalletConnectProvider implements SignerProvider {
     if (this.client.session.length) {
       const lastKeyIndex = this.client.session.keys.length - 1;
       this.session = this.client.session.get(this.client.session.keys[lastKeyIndex]);
-      console.log(`====== load session: ${this.session.topic}`)
     }
   }
 
@@ -420,4 +351,6 @@ export function parseAccount(account: string): Account {
   return { address, group, publicKey };
 }
 
+export * from "./constants";
+export * from "./types";
 export default WalletConnectProvider;

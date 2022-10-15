@@ -112,7 +112,6 @@ export class WalletClient {
     if (!this.client) return;
     if (!this.topic) return;
 
-    console.log(`===== disconnect topic: ${this.topic}`)
     await this.client.disconnect({
       topic: this.topic,
       reason: {
@@ -130,18 +129,6 @@ export class WalletClient {
     if (this.rpcUrl !== rpcUrl) {
       this.rpcUrl = rpcUrl;
     }
-  }
-
-  private async emitAccountsChangedEvent(chainId: string) {
-    // if (typeof this.client === "undefined") return;
-    // if (typeof this.topic === "undefined") return;
-    // const event = {
-    //   name: PROVIDER_EVENTS.accountChanged,
-    //   data: [formatAccount(chainId, this.account)],
-    // };
-
-    // await this.client.emit({ topic: this.topic, event, chainId });
-    return;
   }
 
   private getWallet(privateKey?: string): PrivateKeyWallet {
@@ -170,7 +157,6 @@ export class WalletClient {
 
   private async updateAccounts(chainId: string) {
     await this.updateSession(chainId);
-    await this.emitAccountsChangedEvent(chainId);
   }
 
   private async initialize(opts?: SignClientTypes.Options) {
@@ -251,7 +237,6 @@ export class WalletClient {
         });
 
         const session = await acknowledged();
-        console.log(`====== proposal topic: ${this.topic}`)
         this.topic = session.topic;
       },
     );

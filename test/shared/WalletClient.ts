@@ -13,13 +13,14 @@ import {
 } from '@alephium/web3'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 
-import WalletConnectProvider, {
+import {
   parseChain,
   formatChain,
   PROVIDER_NAMESPACE,
   ChainGroup,
   isCompatibleChainGroup,
   RelayMethod,
+  WalletConnectProvider,
 } from '../../src'
 import SignClient from '@walletconnect/sign-client'
 import { getSdkError } from '@walletconnect/utils'

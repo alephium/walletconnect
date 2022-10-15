@@ -55,8 +55,8 @@ type RelayMethodsTable = {
   }
 }
 assertType<Eq<RelayMethod, keyof RelayMethodsTable>>()
-export type MethodParams<T extends RelayMethod> = RelayMethodsTable[T]['params'];
-export type MethodResult<T extends RelayMethod> = RelayMethodsTable[T]['result'];
+export type RelayMethodParams<T extends RelayMethod> = RelayMethodsTable[T]['params'];
+export type RelayMethodResult<T extends RelayMethod> = RelayMethodsTable[T]['result'];
 
 type ProviderEventArguments = {
   session_ping: SignClientTypes.EventArguments['session_ping']
@@ -71,7 +71,7 @@ assertType<Eq<ProviderEvent, keyof ProviderEventArguments>>()
 export type ProviderEventArgument<T extends ProviderEvent> = ProviderEventArguments[T];
 
 export type NetworkId = number
-export type ChainGroup = number | undefined
+export type ChainGroup = number | undefined // number: a specific address group; undefined: all address groups
 export interface ChainInfo {
   networkId: NetworkId;
   chainGroup: ChainGroup;

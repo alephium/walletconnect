@@ -1,7 +1,8 @@
-import WalletConnectProvider, {
+import {
   formatChain,
   parseChain,
   ProviderOptions,
+  WalletConnectProvider,
 } from '../src/index'
 import { WalletClient } from './shared'
 import {

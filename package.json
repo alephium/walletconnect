@@ -28,7 +28,7 @@
     "test": "jest --detectOpenHandles -i --force-exit --config ./jest-config.json",
     "test:watch": "env TS_NODE_PROJECT=\"tsconfig.cjs.json\" jest --timeout 3000 --exit -r ts-node/register --watch --watch-files . ./test/**/*.spec.ts",
     "watch": "tsc -p tsconfig.json --watch",
-    "lint": "eslint -c '.eslintrc' --fix './src/**/*.ts'"
+    "lint": "eslint -c '.eslintrc' --fix './{src,test}/**/*.ts'"
   },
   "dependencies": {
     "@alephium/web3": "0.2.0-rc.36",
@@ -83,5 +83,14 @@
   "engines": {
     "node": ">=14.0.0",
     "npm": ">=7.0.0"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "tabWidth": 2,
+    "useTabs": false,
+    "semi": false,
+    "singleQuote": true,
+    "bracketSameLine": false,
+    "trailingComma": "none"
   }
 }

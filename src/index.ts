@@ -23,13 +23,13 @@ import {
 import { getChainsFromNamespaces, getAccountsFromNamespaces, getSdkError } from "@walletconnect/utils";
 import SignClient from "@walletconnect/sign-client";
 import { LOGGER, PROVIDER_NAMESPACE, RELAY_METHODS, RELAY_URL } from "./constants";
-import { ChainGroup, MethodParams, MethodResult, NetworkId, ProviderEvent, ProviderMethod } from "./types";
+import { ChainGroup, MethodParams, MethodResult, NetworkId, ProviderEvent, ProviderEventArgument, RelayMethod } from "./types";
 
 export interface ProviderOptions {
   // Alephium options
   networkId: number;
   chainGroup: ChainGroup;
-  methods?: ProviderMethod[];
+  methods?: RelayMethod[];
 
   // WalletConnect options
   projectId?: string;
@@ -49,7 +49,7 @@ class WalletConnectProvider implements SignerProvider {
   public networkId: number;
   public chainGroup: ChainGroup;
   public permittedChain: string;
-  public methods: ProviderMethod[];
+  public methods: RelayMethod[];
 
   public account: Account | undefined = undefined;
 
@@ -69,7 +69,7 @@ class WalletConnectProvider implements SignerProvider {
     this.chainGroup = opts.chainGroup;
     this.permittedChain = formatChain(this.networkId, this.chainGroup);
 
-    this.methods = opts.methods ?? RELAY_METHODS;
+    this.methods = opts.methods ?? [...RELAY_METHODS];
     if (this.methods.includes("alph_requestNodeApi")) {
       this.nodeProvider = NodeProvider.Remote(this.requestNodeAPI);
     } else {
@@ -112,19 +112,19 @@ class WalletConnectProvider implements SignerProvider {
     });
   }
 
-  public on(event: ProviderEvent, listener: any): void {
+  public on<E extends ProviderEvent>(event: E, listener: (args: ProviderEventArgument<E>) => any): void {
     this.events.on(event, listener);
   }
 
-  public once(event: ProviderEvent, listener: any): void {
+  public once<E extends ProviderEvent>(event: ProviderEvent, listener: (args: ProviderEventArgument<E>) => any): void {
     this.events.once(event, listener);
   }
 
-  public removeListener(event: ProviderEvent, listener: any): void {
+  public removeListener<E extends ProviderEvent>(event: ProviderEvent, listener: (args: ProviderEventArgument<E>) => any): void {
     this.events.removeListener(event, listener);
   }
 
-  public off(event: ProviderEvent, listener: any): void {
+  public off<E extends ProviderEvent>(event: ProviderEvent, listener: (args: ProviderEventArgument<E>) => any): void {
     this.events.off(event, listener);
   }
 
@@ -221,7 +221,7 @@ class WalletConnectProvider implements SignerProvider {
     this.events.emit(event, data);
   }
 
-  private typedRequest<T extends ProviderMethod>(
+  private typedRequest<T extends RelayMethod>(
     method: T,
     params: MethodParams<T>
   ): Promise<MethodResult<T>> {

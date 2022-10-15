@@ -19,7 +19,7 @@ import WalletConnectProvider, {
   PROVIDER_NAMESPACE,
   ChainGroup,
   isCompatibleChainGroup,
-  ProviderMethod,
+  RelayMethod,
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
 
@@ -266,7 +266,7 @@ export class WalletClient {
 
           let result: any;
 
-          switch (request.method as ProviderMethod) {
+          switch (request.method as RelayMethod) {
             case "alph_signAndSubmitTransferTx":
               result = await this.signer.signAndSubmitTransferTx(
                 (request.params as any) as SignTransferTxParams,

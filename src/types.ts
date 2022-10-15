@@ -10,18 +10,17 @@ import {
   SignUnsignedTxResult,
   SignMessageParams,
   SignMessageResult,
-  ApiRequestArguments
+  ApiRequestArguments,
+  assertType,
+  Eq
 } from "@alephium/web3";
-import { PROVIDER_METHODS } from "./constants";
+import { SignClientTypes } from "@walletconnect/types";
+import { RELAY_METHODS } from "./constants";
 
-type ProviderMethodsTuple = typeof PROVIDER_METHODS;
-export type ProviderMethod = ProviderMethodsTuple[number];
+type RelayMethodsTuple = typeof RELAY_METHODS;
+export type RelayMethod = RelayMethodsTuple[number];
 
-interface ProviderMethodsTable extends Record<ProviderMethod, { params: any; result: any }> {
-  alph_getSelectedAccount: {
-    params: undefined;
-    result: Account;
-  };
+type RelayMethodsTable = {
   alph_signAndSubmitTransferTx: {
     params: SignTransferTxParams;
     result: SignTransferTxResult
@@ -55,10 +54,21 @@ interface ProviderMethodsTable extends Record<ProviderMethod, { params: any; res
     result: any
   }
 }
-export type MethodParams<T extends ProviderMethod> = ProviderMethodsTable[T]["params"];
-export type MethodResult<T extends ProviderMethod> = ProviderMethodsTable[T]["result"];
+assertType<Eq<RelayMethod, keyof RelayMethodsTable>>();
+export type MethodParams<T extends RelayMethod> = RelayMethodsTable[T]["params"];
+export type MethodResult<T extends RelayMethod> = RelayMethodsTable[T]["result"];
 
+type ProviderEventArguments = {
+  session_ping: SignClientTypes.EventArguments["session_ping"]
+  session_update: SignClientTypes.EventArguments["session_update"]
+  session_delete: SignClientTypes.EventArguments["session_delete"]
+  session_event: SignClientTypes.EventArguments["session_event"]
+  displayUri: string
+  accountChanged: Account
+}
 export type ProviderEvent = "session_ping" | "session_update" | "session_delete" | "session_event" | "displayUri" | "accountChanged";
+assertType<Eq<ProviderEvent, keyof ProviderEventArguments>>();
+export type ProviderEventArgument<T extends ProviderEvent> = ProviderEventArguments[T];
 
 export type NetworkId = number
 export type ChainGroup = number | undefined

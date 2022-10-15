@@ -62,6 +62,7 @@ class WalletConnectProvider implements SignerProvider {
     return provider;
   }
 
+  // Please instantiate a provide with `init(opts)` always
   constructor(opts: ProviderOptions) {
     this.providerOpts = opts;
     this.networkId = opts.networkId;
@@ -79,37 +80,6 @@ class WalletConnectProvider implements SignerProvider {
     } else {
       this.explorerProvider = undefined;
     }
-  }
-
-  // The provider only supports signer methods. The other requests should use Alephium Rest API.
-  public async request<T = unknown>(args: { method: string, params: any }): Promise<T> {
-    if (args.method === "alph_getSelectedAccount") {
-      return Promise.resolve(this.account as T);
-    }
-
-    if (!(this.methods as string[]).includes(args.method)) {
-      return Promise.reject(new Error(`Invalid method was passed ${args.method}`));
-    }
-
-    if (!args.method.startsWith("alph_request")) {
-      const signerAddress = args.params?.signerAddress;
-      if (typeof signerAddress === "undefined") {
-        throw new Error("Cannot request without signerAddress");
-      }
-      const selectedAccount = await this.getSelectedAccount();
-      if (signerAddress !== selectedAccount.address) {
-        throw new Error(`Invalid signer address ${args.params.signerAddress}`);
-      }
-    }
-
-    return this.client.request({
-      request: {
-        method: args.method,
-        params: args.params
-      },
-      chainId: this.permittedChain,
-      topic: this.session?.topic,
-    });
   }
 
   public async connect(): Promise<void> {
@@ -158,10 +128,13 @@ class WalletConnectProvider implements SignerProvider {
     this.events.off(event, listener);
   }
 
-  // ---------- Methods ----------------------------------------------- //
+  // ---------- Signer Methods ----------------------------------------------- //
 
   public getSelectedAccount(): Promise<Account> {
-    return this.typedRequest("alph_getSelectedAccount", undefined);
+    if (this.account === undefined) {
+      throw Error("Account is not available");
+    }
+    return Promise.resolve(this.account);
   }
 
   public async signAndSubmitTransferTx(params: SignTransferTxParams): Promise<SignTransferTxResult> {
@@ -253,6 +226,33 @@ class WalletConnectProvider implements SignerProvider {
     params: MethodParams<T>
   ): Promise<MethodResult<T>> {
     return this.request({ method, params });
+  }
+
+  // The provider only supports signer methods. The other requests should use Alephium Rest API.
+  private async request<T = unknown>(args: { method: string, params: any }): Promise<T> {
+    if (!(this.methods as string[]).includes(args.method)) {
+      return Promise.reject(new Error(`Invalid method was passed: ${args.method}`));
+    }
+
+    if (!args.method.startsWith("alph_request")) {
+      const signerAddress = args.params?.signerAddress;
+      if (typeof signerAddress === "undefined") {
+        throw new Error("Cannot request without signerAddress");
+      }
+      const selectedAccount = await this.getSelectedAccount();
+      if (signerAddress !== selectedAccount.address) {
+        throw new Error(`Invalid signer address: ${args.params.signerAddress}`);
+      }
+    }
+
+    return this.client.request({
+      request: {
+        method: args.method,
+        params: args.params
+      },
+      chainId: this.permittedChain,
+      topic: this.session?.topic,
+    });
   }
 
   private requestNodeAPI = (args: ApiRequestArguments): Promise<any> => {

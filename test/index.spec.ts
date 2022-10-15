@@ -1,6 +1,3 @@
-import "mocha";
-import { expect } from "chai";
-
 import WalletConnectProvider, {
   formatChain,
   parseChain,
@@ -104,66 +101,68 @@ export const TEST_SIGN_CLIENT_OPTIONS: SignClientTypes.Options = {
   metadata: TEST_APP_METADATA
 };
 
+jest.setTimeout(30_000);
+
 describe("Unit tests", function() {
   const expectedChainGroup0 = 2;
   const expectedChainGroup1 = 1;
 
   it("test formatChain & parseChain", () => {
-    expect(formatChain(4, expectedChainGroup0)).to.eql("alephium:4/2");
-    expect(formatChain(4, expectedChainGroup1)).to.eql("alephium:4/1");
-    expect(formatChain(4, undefined)).to.eql("alephium:4/-1");
-    expect(() => formatChain(4, -1)).to.throw();
-    expect(parseChain("alephium:4/2")).to.eql([4, 2]);
-    expect(parseChain("alephium:4/1")).to.eql([4, 1]);
-    expect(parseChain("alephium:4/-1")).to.eql([4, undefined]);
-    expect(() => parseChain("alephium:4/-2")).to.throw();
+    expect(formatChain(4, expectedChainGroup0)).toEqual("alephium:4/2");
+    expect(formatChain(4, expectedChainGroup1)).toEqual("alephium:4/1");
+    expect(formatChain(4, undefined)).toEqual("alephium:4/-1");
+    expect(() => formatChain(4, -1)).toThrow();
+    expect(parseChain("alephium:4/2")).toEqual([4, 2]);
+    expect(parseChain("alephium:4/1")).toEqual([4, 1]);
+    expect(parseChain("alephium:4/-1")).toEqual([4, undefined]);
+    expect(() => parseChain("alephium:4/-2")).toThrow();
   });
 
-  it('should initialize providers', () => {
+  it("should initialize providers", () => {
     const provider0 = new WalletConnectProvider(TEST_PROVIDER_OPTS);
-    expect(provider0.nodeProvider !== undefined).to.equal(true);
-    expect(provider0.explorerProvider !== undefined).to.equal(true);
+    expect(provider0.nodeProvider !== undefined).toEqual(true);
+    expect(provider0.explorerProvider !== undefined).toEqual(true);
     const provider1 = new WalletConnectProvider({ ...TEST_PROVIDER_OPTS, methods: [] });
-    expect(provider1.nodeProvider === undefined).to.equal(true);
-    expect(provider1.explorerProvider === undefined).to.equal(true);
+    expect(provider1.nodeProvider === undefined).toEqual(true);
+    expect(provider1.explorerProvider === undefined).toEqual(true);
   })
 });
 
 describe("WalletConnectProvider with single chainGroup", function() {
-  this.timeout(30_000);
-
   let provider: WalletConnectProvider;
   let walletClient: WalletClient;
   let walletAddress: string;
 
-  before(async () => {
+  beforeAll(async () => {
     provider = await WalletConnectProvider.init({
       ...TEST_PROVIDER_OPTS
     });
     walletClient = await WalletClient.init(provider, TEST_WALLET_CLIENT_OPTS);
     walletAddress = walletClient.signer.address;
-    expect(walletAddress).to.eql(ACCOUNTS.a.address);
+    expect(walletAddress).toEqual(ACCOUNTS.a.address);
     await provider.connect();
-    expect(provider['permittedChain']).to.eql("alephium:4/0")
+    expect(provider['permittedChain']).toEqual("alephium:4/0")
     const selectetAccount = await provider.getSelectedAccount()
-    expect(selectetAccount.address).to.eql(signerA.address)
+    expect(selectetAccount.address).toEqual(signerA.address)
   });
 
-  after(async () => {
-    // disconnect provider
-    await Promise.all([
-      new Promise<void>(async resolve => {
-        provider.on("session_delete", () => {
+  afterAll(async () => {
+    if (!walletClient.disconnected) {
+      // disconnect provider
+      await Promise.all([
+        new Promise<void>(async resolve => {
+          provider.on("session_delete", () => {
+            resolve();
+          });
+        }),
+        new Promise<void>(async (resolve) => {
+          await walletClient.disconnect();
           resolve();
-        });
-      }),
-      new Promise<void>(async (resolve) => {
-        await walletClient.disconnect();
-        resolve();
-      }),
-    ]);
-    // expect provider to be disconnected
-    expect(walletClient.client?.session.values.length).to.eql(0);
+        }),
+      ]);
+      // expect provider to be disconnected
+      expect(walletClient.client?.session.values.length).toEqual(0);
+    }
   });
 
   it("should forward requests", async () => {
@@ -173,7 +172,7 @@ describe("WalletConnectProvider with single chainGroup", function() {
   it("accountChanged", async () => {
     // change to account within the same group
     const currentAccount = (await provider.getSelectedAccount())
-    expect(currentAccount.address).to.eql(ACCOUNTS.a.address)
+    expect(currentAccount.address).toEqual(ACCOUNTS.a.address)
     const newAccount = PrivateKeyWallet.Random(currentAccount.group);
     await verifyAccountsChange(newAccount.privateKey, newAccount.address, provider, walletClient)
 
@@ -198,13 +197,11 @@ describe("WalletConnectProvider with single chainGroup", function() {
 });
 
 describe("WalletConnectProvider with arbitrary chainGroup", function() {
-  this.timeout(30_000);
-
   let provider: WalletConnectProvider;
   let walletClient: WalletClient;
   let walletAddress: string;
 
-  before(async () => {
+  beforeAll(async () => {
     provider = await WalletConnectProvider.init({
       ...TEST_PROVIDER_OPTS,
       networkId: NETWORK_ID,
@@ -212,28 +209,30 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
     });
     walletClient = await WalletClient.init(provider, TEST_WALLET_CLIENT_OPTS);
     walletAddress = walletClient.signer.address;
-    expect(walletAddress).to.eql(ACCOUNTS.a.address);
+    expect(walletAddress).toEqual(ACCOUNTS.a.address);
     await provider.connect();
-    expect(provider['permittedChain']).to.eql('alephium:4/-1')
+    expect(provider['permittedChain']).toEqual('alephium:4/-1')
     const selectedAccount = await provider.getSelectedAccount()
-    expect(selectedAccount.address).to.eql(signerA.address)
+    expect(selectedAccount.address).toEqual(signerA.address)
   });
 
-  after(async () => {
-    // disconnect provider
-    await Promise.all([
-      new Promise<void>(async resolve => {
-        provider.on("session_delete", () => {
+  afterAll(async () => {
+    if (!walletClient.disconnected) {
+      // disconnect provider
+      await Promise.all([
+        new Promise<void>(async resolve => {
+          provider.on("session_delete", () => {
+            resolve();
+          });
+        }),
+        new Promise<void>(async (resolve) => {
+          await walletClient.disconnect();
           resolve();
-        });
-      }),
-      new Promise<void>(async (resolve) => {
-        await walletClient.disconnect();
-        resolve();
-      }),
-    ]);
-    // expect provider to be disconnected
-    expect(walletClient.client?.session.values.length).to.eql(0);
+        }),
+      ]);
+      // expect provider to be disconnected
+      expect(walletClient.client?.session.values.length).toEqual(0);
+    }
   });
 
   it("accountChanged", async () => {
@@ -264,7 +263,7 @@ async function verifyNetworkChange(
         resolve();
       });
     }),
-    walletClient.changeChain(networkId, rpcUrl)
+    await walletClient.changeChain(networkId, rpcUrl)
   ]);
 }
 
@@ -278,7 +277,7 @@ async function verifyAccountsChange(
     new Promise<void>((resolve, reject) => {
       provider.on("accountChanged", account => {
         try {
-          expect(account.address).to.eql(address);
+          expect(account.address).toEqual(address);
           resolve();
         } catch (e) {
           reject(e);
@@ -297,7 +296,7 @@ async function verifySign(
   async function checkBalanceDecreasing() {
     delay(500);
     const balance1 = await nodeProvider.addresses.getAddressesAddressBalance(ACCOUNTS.a.address);
-    expect(balance1.utxoNum).to.eql(1);
+    expect(balance1.utxoNum).toEqual(1);
     if (balance1.balance >= balance.balance) {
       checkBalanceDecreasing();
     }
@@ -307,10 +306,10 @@ async function verifySign(
   await Project.build()
   const selectedAccount = await provider.getSelectedAccount();
 
-  expect(selectedAccount.address).to.eql(ACCOUNTS.a.address);
+  expect(selectedAccount.address).toEqual(ACCOUNTS.a.address);
 
   balance = await nodeProvider.addresses.getAddressesAddressBalance(ACCOUNTS.a.address);
-  expect(balance.utxoNum).to.eql(1);
+  expect(balance.utxoNum).toEqual(1);
 
   await provider.signAndSubmitTransferTx({
     signerAddress: signerA.address,
@@ -336,7 +335,7 @@ async function verifySign(
     message: message,
     signerAddress: signerA.address,
   });
-  expect(verifySignedMessage(message, signerA.publicKey, signedMessage.signature)).to.be.true;
+  expect(verifySignedMessage(message, signerA.publicKey, signedMessage.signature)).toEqual(true);
 }
 
 function delay(ms: number) {
@@ -347,12 +346,5 @@ async function expectThrowsAsync(
   method: () => Promise<any>,
   errorMessage: string
 ) {
-  let error: Error | undefined = undefined
-  try {
-    await method()
-  } catch (err) {
-    error = err
-  }
-  expect(error).to.be.an('Error')
-  expect(error?.message).to.equal(errorMessage)
+  expect(method()).rejects.toThrow(errorMessage)
 }

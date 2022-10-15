@@ -283,6 +283,7 @@ class WalletConnectProvider implements SignerProvider {
     if (this.client.session.length) {
       const lastKeyIndex = this.client.session.keys.length - 1;
       this.session = this.client.session.get(this.client.session.keys[lastKeyIndex]);
+      console.log(`====== load session: ${this.session.topic}`)
     }
   }
 

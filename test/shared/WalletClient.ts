@@ -45,6 +45,8 @@ export class WalletClient {
   public namespace?: SessionTypes.Namespace;
   public permittedChainGroup: ChainGroup;
 
+  public disconnected = false;
+
   static async init(
     provider: WalletConnectProvider,
     opts: Partial<WalletClientAsyncOpts>,
@@ -110,6 +112,7 @@ export class WalletClient {
     if (!this.client) return;
     if (!this.topic) return;
 
+    console.log(`===== disconnect topic: ${this.topic}`)
     await this.client.disconnect({
       topic: this.topic,
       reason: {
@@ -117,6 +120,7 @@ export class WalletClient {
         message: "User disconnected."
       }
     });
+    this.disconnected = true
   }
 
   private setNetworkId(networkId: number, rpcUrl: string) {
@@ -247,6 +251,7 @@ export class WalletClient {
         });
 
         const session = await acknowledged();
+        console.log(`====== proposal topic: ${this.topic}`)
         this.topic = session.topic;
       },
     );
@@ -319,7 +324,8 @@ export class WalletClient {
 
           const response = formatJsonRpcResult(id, result);
           await this.client.respond({ topic, response });
-        } catch (e) {
+        } catch (error) {
+          const e = error as Error;
           const message = e.message || e.toString();
           const response = formatJsonRpcError(id, message);
           await this.client.respond({ topic, response });

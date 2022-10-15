@@ -1,5 +1,7 @@
 import EventEmitter from 'eventemitter3'
 import { SessionTypes, SignClientTypes } from '@walletconnect/types'
+import SignClient from '@walletconnect/sign-client'
+import { getChainsFromNamespaces, getAccountsFromNamespaces, getSdkError } from '@walletconnect/utils'
 import {
   SignerProvider,
   Account,
@@ -20,8 +22,6 @@ import {
   ApiRequestArguments,
 } from '@alephium/web3'
 
-import { getChainsFromNamespaces, getAccountsFromNamespaces, getSdkError } from '@walletconnect/utils'
-import SignClient from '@walletconnect/sign-client'
 import { LOGGER, PROVIDER_NAMESPACE, RELAY_METHODS, RELAY_URL } from './constants'
 import { ChainGroup, RelayMethodParams, RelayMethodResult, NetworkId, ProviderEvent, ProviderEventArgument, RelayMethod } from './types'
 
@@ -184,7 +184,7 @@ export class WalletConnectProvider implements SignerProvider {
       }))
   }
 
-  private async checkStorage() {
+  private checkStorage() {
     if (this.client.session.length) {
       const lastKeyIndex = this.client.session.keys.length - 1
       this.session = this.client.session.get(this.client.session.keys[lastKeyIndex])

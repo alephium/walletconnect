@@ -151,7 +151,7 @@ describe('WalletConnectProvider with single chainGroup', function() {
     if (!walletClient.disconnected) {
       // disconnect provider
       await Promise.all([
-        new Promise<void>(async resolve => {
+        new Promise<void>(resolve => {
           provider.on('session_delete', () => {
             resolve()
           })
@@ -182,7 +182,7 @@ describe('WalletConnectProvider with single chainGroup', function() {
     await verifyAccountsChange(ACCOUNTS.a.privateKey, ACCOUNTS.a.address, provider, walletClient)
 
     // change to account b, which is not supported
-    await expectThrowsAsync(
+    expectThrowsAsync(
       async () => await walletClient.changeAccount(ACCOUNTS.b.privateKey),
       'Error changing account, chain alephium:4/1 not permitted',
     )
@@ -218,7 +218,7 @@ describe('WalletConnectProvider with arbitrary chainGroup', function() {
     if (!walletClient.disconnected) {
       // disconnect provider
       await Promise.all([
-        new Promise<void>(async resolve => {
+        new Promise<void>(resolve => {
           provider.on('session_delete', () => {
             resolve()
           })
@@ -336,7 +336,7 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function expectThrowsAsync(
+function expectThrowsAsync(
   method: () => Promise<any>,
   errorMessage: string,
 ) {

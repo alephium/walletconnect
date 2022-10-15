@@ -1,7 +1,7 @@
 {
-  "name": "@h0ngcha0/walletconnect-provider",
+  "name": "@alephium/walletconnect-provider",
   "description": "Alephium Provider for WalletConnect Protocol",
-  "version": "0.2.0-rc.7",
+  "version": "0.2.0-rc.1",
   "author": "Alephium dev",
   "homepage": "https://github.com/alephium/walletconnect",
   "repository": {
@@ -75,7 +75,7 @@
     "webpack-cli": "4.10.0"
   },
   "engines": {
-    "node": ">=14.0.0",
+    "node": ">=16.0.0",
     "npm": ">=7.0.0"
   },
   "prettier": {

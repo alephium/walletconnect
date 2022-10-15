@@ -101,8 +101,6 @@ export const TEST_SIGN_CLIENT_OPTIONS: SignClientTypes.Options = {
   metadata: TEST_APP_METADATA
 };
 
-jest.setTimeout(30_000);
-
 describe("Unit tests", function() {
   const expectedChainGroup0 = 2;
   const expectedChainGroup1 = 1;
@@ -155,19 +153,20 @@ describe("WalletConnectProvider with single chainGroup", function() {
             resolve();
           });
         }),
-        new Promise<void>(async (resolve) => {
-          await walletClient.disconnect();
-          resolve();
-        }),
+        walletClient.disconnect()
       ]);
-      // expect provider to be disconnected
-      expect(walletClient.client?.session.values.length).toEqual(0);
     }
+    // expect provider to be disconnected
+    expect(walletClient.client?.session.values.length).toEqual(0);
   });
 
   it("should forward requests", async () => {
     await provider.nodeProvider!.infos.getInfosVersion();
   })
+
+  it("should sign", async () => {
+    await verifySign(provider, walletClient)
+  });
 
   it("accountChanged", async () => {
     // change to account within the same group
@@ -184,10 +183,6 @@ describe("WalletConnectProvider with single chainGroup", function() {
       async () => await walletClient.changeAccount(ACCOUNTS.b.privateKey),
       "Error changing account, chain alephium:4/1 not permitted"
     )
-  });
-
-  it("should sign", async () => {
-    await verifySign(provider, walletClient)
   });
 
   it("networkChanged", async () => {
@@ -225,14 +220,15 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
             resolve();
           });
         }),
-        new Promise<void>(async (resolve) => {
-          await walletClient.disconnect();
-          resolve();
-        }),
+        walletClient.disconnect()
       ]);
-      // expect provider to be disconnected
-      expect(walletClient.client?.session.values.length).toEqual(0);
     }
+    // expect provider to be disconnected
+    expect(walletClient.client?.session.values.length).toEqual(0);
+  });
+
+  it("should sign", async () => {
+    await verifySign(provider, walletClient)
   });
 
   it("accountChanged", async () => {
@@ -244,10 +240,6 @@ describe("WalletConnectProvider with arbitrary chainGroup", function() {
 
     // change back to account a
     await verifyAccountsChange(ACCOUNTS.a.privateKey, ACCOUNTS.a.address, provider, walletClient)
-  });
-
-  it("should sign", async () => {
-    await verifySign(provider, walletClient)
   });
 });
 
@@ -296,8 +288,7 @@ async function verifySign(
   async function checkBalanceDecreasing() {
     delay(500);
     const balance1 = await nodeProvider.addresses.getAddressesAddressBalance(ACCOUNTS.a.address);
-    expect(balance1.utxoNum).toEqual(1);
-    if (balance1.balance >= balance.balance) {
+    if (balance1.balance >= balance.balance || balance1.balance === "0") {
       checkBalanceDecreasing();
     }
     balance = balance1;

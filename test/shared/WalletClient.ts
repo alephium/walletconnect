@@ -22,6 +22,7 @@ import WalletConnectProvider, {
   RelayMethod,
 } from "../../src";
 import SignClient from "@walletconnect/sign-client";
+import { getSdkError } from "@walletconnect/utils";
 
 export interface WalletClientOpts {
   activePrivateKey: string;
@@ -105,7 +106,7 @@ export class WalletClient {
     }
 
     this.setNetworkId(networkId, rpcUrl);
-    this.disconnect()
+    await this.disconnect()
   }
 
   public async disconnect() {
@@ -114,10 +115,7 @@ export class WalletClient {
 
     await this.client.disconnect({
       topic: this.topic,
-      reason: {
-        code: 6000,
-        message: "User disconnected."
-      }
+      reason: getSdkError("USER_DISCONNECTED")
     });
     this.disconnected = true
   }

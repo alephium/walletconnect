@@ -1,12 +1,5 @@
-import { EventEmitter } from "eventemitter3";
-import { JsonRpcProvider } from "@walletconnect/jsonrpc-provider";
-import { RequestArguments } from "@walletconnect/jsonrpc-utils";
-import { SessionTypes } from "@walletconnect/types";
-import {
-  SignerConnection,
-  SIGNER_EVENTS,
-  SignerConnectionClientOpts,
-} from "@walletconnect/signer-connection";
+import EventEmitter from "eventemitter3";
+import { SessionTypes, SignClientTypes } from "@walletconnect/types";
 import {
   SignerProvider,
   Account,
@@ -27,7 +20,9 @@ import {
   ApiRequestArguments
 } from "@alephium/web3";
 
-import { getChainsFromNamespaces, getAccountsFromNamespaces } from "@walletconnect/utils";
+import { getChainsFromNamespaces, getAccountsFromNamespaces, getSdkError } from "@walletconnect/utils";
+import SignClient from "@walletconnect/sign-client";
+import { LOGGER, RELAY_URL } from "./constants";
 
 // Note:
 // 1. the wallet client could potentially submit the signed transaction.
@@ -87,13 +82,7 @@ interface ProviderMethodsTable extends Record<ProviderMethod, { params: any; res
 type MethodParams<T extends ProviderMethod> = ProviderMethodsTable[T]["params"];
 type MethodResult<T extends ProviderMethod> = ProviderMethodsTable[T]["result"];
 
-export const PROVIDER_EVENTS = {
-  connect: "connect",
-  disconnect: "disconnect",
-  displayUri: "displayUri",
-  networkChanged: "networkChanged",
-  accountChanged: "accountChanged",
-};
+export type ProviderEvent = "session_ping" | "session_update" | "session_delete" | "session_event" | "displayUri" | "accountChanged";
 
 export type NetworkId = number
 export type ChainGroup = number | undefined
@@ -104,35 +93,50 @@ export interface ChainInfo {
 
 export const PROVIDER_NAMESPACE = "alephium";
 
-export interface WalletConnectProviderOptions {
+export interface ProviderOptions {
+  // Alephium options
   networkId: number;
   chainGroup: ChainGroup;
   methods?: ProviderMethod[];
-  client?: SignerConnectionClientOpts;
+
+  // WalletConnect options
+  projectId?: string;
+  metadata?: SignClientTypes.Metadata;
+  logger?: string;
+  client?: SignClient;
+  relayUrl?: string;
 }
 
 class WalletConnectProvider implements SignerProvider {
-  public events: any = new EventEmitter();
+  private providerOpts: ProviderOptions;
+
+  public events: EventEmitter = new EventEmitter();
   public nodeProvider: NodeProvider | undefined;
   public explorerProvider: ExplorerProvider | undefined;
 
   public networkId: number;
   public chainGroup: ChainGroup;
+  public permittedChain: string;
   public methods: ProviderMethod[];
 
   public account: Account | undefined = undefined;
 
-  public signer: JsonRpcProvider;
+  public client!: SignClient;
+  public session!: SessionTypes.Struct;
 
-  private get permittedChain(): string {
-    return formatChain(this.networkId, this.chainGroup);
+  static async init(opts: ProviderOptions): Promise<WalletConnectProvider> {
+    const provider = new WalletConnectProvider(opts);
+    await provider.initialize();
+    return provider;
   }
 
-  constructor(opts: WalletConnectProviderOptions) {
+  constructor(opts: ProviderOptions) {
+    this.providerOpts = opts;
     this.networkId = opts.networkId;
     this.chainGroup = opts.chainGroup;
+    this.permittedChain = formatChain(this.networkId, this.chainGroup);
 
-    this.methods = opts.methods ?? [...PROVIDER_METHODS];
+    this.methods = opts.methods ?? [...PROVIDER_METHODS.slice(1)];
     if (this.methods.includes("alph_requestNodeApi")) {
       this.nodeProvider = NodeProvider.Remote(this.requestNodeAPI);
     } else {
@@ -143,13 +147,10 @@ class WalletConnectProvider implements SignerProvider {
     } else {
       this.explorerProvider = undefined;
     }
-
-    this.signer = this.setSignerProvider(opts.client);
-    this.registerEventListeners();
   }
 
   // The provider only supports signer methods. The other requests should use Alephium Rest API.
-  public async request<T = unknown>(args: RequestArguments): Promise<T> {
+  public async request<T = unknown>(args: { method: string, params: any }): Promise<T> {
     if (args.method === "alph_getSelectedAccount") {
       return Promise.resolve(this.account as T);
     }
@@ -169,57 +170,63 @@ class WalletConnectProvider implements SignerProvider {
       }
     }
 
-    return this.signer.request(args, { chainId: this.permittedChain });
+    return this.client.request({
+      request: {
+        method: args.method,
+        params: args.params
+      },
+      chainId: this.permittedChain,
+      topic: this.session?.topic,
+    });
   }
 
   public async connect(): Promise<void> {
-    await this.signer.connect();
-  }
+    const { uri, approval } = await this.client.connect({
+      requiredNamespaces: {
+        alephium: {
+          chains: [this.permittedChain],
+          methods: this.methods,
+          events: ["accountChanged"],
+        },
+      },
+    });
 
-  get connected(): boolean {
-    return (this.signer.connection as SignerConnection).connected;
-  }
+    if (uri) {
+      this.emitEvents("displayUri", uri);
+    }
 
-  get connecting(): boolean {
-    return (this.signer.connection as SignerConnection).connecting;
+    this.session = await approval();
+    this.updateNamespace(this.session.namespaces);
   }
 
   public async disconnect(): Promise<void> {
-    await this.signer.disconnect();
+    if (!this.client) {
+      throw new Error("Sign Client not initialized");
+    }
+
+    await this.client.disconnect({
+      topic: this.session.topic,
+      reason: getSdkError("USER_DISCONNECTED")
+    });
   }
 
-  public on(event: any, listener: any): void {
+  public on(event: ProviderEvent, listener: any): void {
     this.events.on(event, listener);
   }
 
-  public once(event: string, listener: any): void {
+  public once(event: ProviderEvent, listener: any): void {
     this.events.once(event, listener);
   }
 
-  public removeListener(event: string, listener: any): void {
+  public removeListener(event: ProviderEvent, listener: any): void {
     this.events.removeListener(event, listener);
   }
 
-  public off(event: string, listener: any): void {
+  public off(event: ProviderEvent, listener: any): void {
     this.events.off(event, listener);
   }
 
   // ---------- Methods ----------------------------------------------- //
-
-  private typedRequest<T extends ProviderMethod>(
-    method: T,
-    params: MethodParams<T>
-  ): Promise<MethodResult<T>> {
-    return this.request({ method, params });
-  }
-
-  private requestNodeAPI = (args: ApiRequestArguments): Promise<any> => {
-    return this.typedRequest("alph_requestNodeApi", args);
-  }
-
-  private requestExplorerAPI = (args: ApiRequestArguments): Promise<any> => {
-    return this.typedRequest("alph_requestExplorerApi", args);
-  }
 
   public getSelectedAccount(): Promise<Account> {
     return this.typedRequest("alph_getSelectedAccount", undefined);
@@ -254,67 +261,80 @@ class WalletConnectProvider implements SignerProvider {
   }
 
   // ---------- Private ----------------------------------------------- //
+
+  private async initialize() {
+    await this.createClient();
+    this.checkStorage();
+    this.registerEventListeners();
+  }
+
+  private async createClient() {
+    this.client =
+      this.providerOpts.client ||
+      (await SignClient.init({
+        logger: this.providerOpts.logger || LOGGER,
+        relayUrl: this.providerOpts.relayUrl || RELAY_URL,
+        projectId: this.providerOpts.projectId,
+        metadata: this.providerOpts.metadata, // fetch metadata automatically if not provided?
+      }));
+  }
+
+  private async checkStorage() {
+    if (this.client.session.length) {
+      const lastKeyIndex = this.client.session.keys.length - 1;
+      this.session = this.client.session.get(this.client.session.keys[lastKeyIndex]);
+    }
+  }
+
   private registerEventListeners() {
-    this.signer.on("connect", async () => {
-      const chains = (this.signer.connection as SignerConnection).chains;
-      if (chains && chains.length) this.setChain(chains);
-      const accounts = (this.signer.connection as SignerConnection).accounts;
-      if (accounts && accounts.length) this.setAccounts(accounts);
-      this.events.emit(PROVIDER_EVENTS.connect);
+    if (typeof this.client === "undefined") {
+      throw new Error("Sign Client is not initialized");
+    }
+
+    this.client.on("session_ping", (args) => {
+      this.emitEvents("session_ping", args);
     });
 
-    this.signer.on("disconnect", () => {
-      this.events.emit(PROVIDER_EVENTS.disconnect);
+    this.client.on("session_event", (args) => {
+      this.emitEvents("session_event", args);
     });
 
-    this.signer.connection.on(SIGNER_EVENTS.created, (session: SessionTypes.Struct) => {
-      this.updateNamespace(session);
+    this.client.on("session_update", ({ topic, params }) => {
+      const { namespaces } = params;
+      const _session = this.client?.session.get(topic);
+      this.session = { ..._session, namespaces } as SessionTypes.Struct;
+      this.updateNamespace(this.session.namespaces);
+      this.emitEvents("session_update", { topic, params });
     });
 
-    this.signer.connection.on(SIGNER_EVENTS.uri, async ({ uri }: { uri: string }) => {
-      this.events.emit(PROVIDER_EVENTS.displayUri, uri);
+    this.client.on("session_delete", () => {
+      this.emitEvents("session_delete");
     });
-
-    this.signer.connection.on(SIGNER_EVENTS.updated, (session: SessionTypes.Struct) => {
-      this.updateNamespace(session);
-    });
-
-    this.signer.connection.on(
-      SIGNER_EVENTS.event,
-      (params: any) => {
-        const { event } = params;
-        if (event.name === PROVIDER_EVENTS.accountChanged) {
-          this.setAccounts(event.data);
-        } else if (event.name === PROVIDER_EVENTS.networkChanged) {
-          this.networkId = event.data;
-          this.events.emit(PROVIDER_EVENTS.networkChanged, this.networkId);
-        } else {
-          this.events.emit(event.name, event.data);
-        }
-      },
-    );
   }
 
-  private setSignerProvider(
-    client?: SignerConnectionClientOpts,
-  ) {
-    const connection = new SignerConnection({
-      client,
-      requiredNamespaces: {
-        alephium: {
-          chains: [this.permittedChain],
-          methods: this.methods,
-          events: ["accountChanged"],
-        },
-      },
-    });
-    return new JsonRpcProvider(connection);
+  private emitEvents(event: ProviderEvent, data?: any): void {
+    this.events.emit(event, data);
   }
 
-  private updateNamespace(session: SessionTypes.Struct) {
-    const chains = getChainsFromNamespaces(session.namespaces, [PROVIDER_NAMESPACE]);
+  private typedRequest<T extends ProviderMethod>(
+    method: T,
+    params: MethodParams<T>
+  ): Promise<MethodResult<T>> {
+    return this.request({ method, params });
+  }
+
+  private requestNodeAPI = (args: ApiRequestArguments): Promise<any> => {
+    return this.typedRequest("alph_requestNodeApi", args);
+  }
+
+  private requestExplorerAPI = (args: ApiRequestArguments): Promise<any> => {
+    return this.typedRequest("alph_requestExplorerApi", args);
+  }
+
+  private updateNamespace(namespaces: SessionTypes.Namespaces) {
+    const chains = getChainsFromNamespaces(namespaces, [PROVIDER_NAMESPACE]);
     this.setChain(chains);
-    const accounts = getAccountsFromNamespaces(session.namespaces, [PROVIDER_NAMESPACE]);
+    const accounts = getAccountsFromNamespaces(namespaces, [PROVIDER_NAMESPACE]);
     this.setAccounts(accounts);
   }
 
@@ -359,7 +379,7 @@ class WalletConnectProvider implements SignerProvider {
     }
 
     this.account = newAccount;
-    this.events.emit(PROVIDER_EVENTS.accountChanged, newAccount);
+    this.emitEvents("accountChanged", newAccount);
   }
 }
 

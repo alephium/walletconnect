@@ -1,5 +1,5 @@
 import { SessionTypes, SignClientTypes } from "@walletconnect/types";
-import { formatJsonRpcError, formatJsonRpcResult, RequestArguments } from "@walletconnect/jsonrpc-utils";
+import { formatJsonRpcError, formatJsonRpcResult } from "@walletconnect/jsonrpc-utils";
 import {
   NodeProvider,
   SignTransferTxParams,
@@ -16,8 +16,6 @@ import { PrivateKeyWallet } from "@alephium/web3-wallet";
 import WalletConnectProvider, {
   parseChain,
   formatChain,
-  formatAccount,
-  PROVIDER_EVENTS,
   PROVIDER_NAMESPACE,
   ChainGroup,
   isCompatibleChainGroup,
@@ -30,7 +28,6 @@ export interface WalletClientOpts {
   otherPrivateKeys: string[],
   networkId: number;
   rpcUrl: string;
-  submitTx?: boolean;
 }
 
 export type WalletClientAsyncOpts = WalletClientOpts & SignClientTypes.Options;
@@ -39,16 +36,14 @@ export class WalletClient {
   public provider: WalletConnectProvider;
   public nodeProvider: NodeProvider;
   public signer: PrivateKeyWallet;
-  public otherSigners: PrivateKeyWallet[];
   public networkId: number;
   public rpcUrl: string;
-  public submitTx: boolean;
 
   public client?: SignClient;
   public topic?: string;
 
   public namespace?: SessionTypes.Namespace;
-  public permittedChainGroup: ChainGroup
+  public permittedChainGroup: ChainGroup;
 
   static async init(
     provider: WalletConnectProvider,
@@ -73,21 +68,16 @@ export class WalletClient {
 
   get accounts(): Account[] {
     const accounts = [this.account]
-    this.otherSigners.forEach((signer) => {
-      accounts.push(signer.account)
-    })
     return accounts
   }
 
   constructor(provider: WalletConnectProvider, opts: Partial<WalletClientOpts>) {
     this.provider = provider;
-    this.networkId = opts?.networkId || 4;
+    this.networkId = opts?.networkId ?? -1;
     this.rpcUrl = opts?.rpcUrl || "http://alephium:22973";
-    this.submitTx = opts?.submitTx || false;
     this.permittedChainGroup = undefined;
     this.nodeProvider = new NodeProvider(this.rpcUrl);
     this.signer = this.getWallet(opts.activePrivateKey);
-    this.otherSigners = opts.otherPrivateKeys?.map((privateKey) => this.getWallet(privateKey)) ?? []
   }
 
   public async changeAccount(privateKey: string) {
@@ -139,14 +129,15 @@ export class WalletClient {
   }
 
   private async emitAccountsChangedEvent(chainId: string) {
-    if (typeof this.client === "undefined") return;
-    if (typeof this.topic === "undefined") return;
-    const event = {
-      name: PROVIDER_EVENTS.accountChanged,
-      data: [formatAccount(chainId, this.account)],
-    };
+    // if (typeof this.client === "undefined") return;
+    // if (typeof this.topic === "undefined") return;
+    // const event = {
+    //   name: PROVIDER_EVENTS.accountChanged,
+    //   data: [formatAccount(chainId, this.account)],
+    // };
 
-    await this.client.emit({ topic: this.topic, event, chainId });
+    // await this.client.emit({ topic: this.topic, event, chainId });
+    return;
   }
 
   private getWallet(privateKey?: string): PrivateKeyWallet {
@@ -213,7 +204,7 @@ export class WalletClient {
     }
 
     // auto-pair
-    this.provider.on(PROVIDER_EVENTS.displayUri, async (uri: string) => {
+    this.provider.on("displayUri", async (uri: string) => {
       if (typeof this.client === "undefined") {
         throw new Error("Client not initialized");
       }

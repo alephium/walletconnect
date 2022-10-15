@@ -27,16 +27,16 @@ import { ChainGroup, MethodParams, MethodResult, NetworkId, ProviderEvent, Provi
 
 export interface ProviderOptions {
   // Alephium options
-  networkId: number;
-  chainGroup: ChainGroup;
-  methods?: RelayMethod[];
+  networkId: number; // the id of the network, e.g. 0 for mainnet, 1 for testnet, 4 for devnet, etc.
+  chainGroup?: number; // either a specific group or undefined to support all groups
+  methods?: RelayMethod[]; // all of the methods to be used in relay; no need to configure in most cases
 
   // WalletConnect options
   projectId?: string;
-  metadata?: SignClientTypes.Metadata;
-  logger?: string;
-  client?: SignClient;
-  relayUrl?: string;
+  metadata?: SignClientTypes.Metadata; // metadata used to initialize a sign client
+  logger?: string; // default logger level is Error; no need to configure in most cases
+  client?: SignClient; // existing sign client; no need to configure in most cases
+  relayUrl?: string; // the url of the relay server; no need to configure in most cases
 }
 
 class WalletConnectProvider implements SignerProvider {

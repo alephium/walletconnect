@@ -32,8 +32,8 @@
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
     "suppressImplicitAnyIndexErrors": true,
-    "target": "es2017",
+    "target": "es2020",
     "outDir": "./dist"
   },
-  "include": ["./src/**/*"]
+  "include": ["./src/**/*.ts"]
 }

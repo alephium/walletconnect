@@ -1,4 +1,5 @@
 {
+  "plugins": ["prettier", "@typescript-eslint", "jest"],
   "rules": {
     "@typescript-eslint/ban-ts-ignore": ["off"],
     "@typescript-eslint/camelcase": ["off"],
@@ -10,14 +11,13 @@
     "@typescript-eslint/no-use-before-define": ["off"],
     "@typescript-eslint/no-unused-vars": ["off"],
     "@typescript-eslint/no-namespace": ["off"],
+    "@typescript-eslint/require-await": ["warn"],
     "comma-dangle": ["error", "always-multiline"],
     "no-async-promise-executor": ["off"],
     "no-empty-pattern": ["off"],
     "no-undef": ["error"],
     "no-var": ["error"],
     "object-curly-spacing": ["error", "always"],
-    "quotes": ["error", "double", { "allowTemplateLiterals": true }],
-    "semi": ["error", "always"],
     "spaced-comment": ["off"],
     "no-prototype-builtins": ["off"],
     "sort-keys": ["off"],
@@ -27,7 +27,8 @@
   },
   "env": {
     "browser": true,
-    "es6": true
+    "es6": true,
+    "jest/globals": true
   },
   "extends": [
     "standard",
@@ -38,7 +39,7 @@
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": 2018,
-    "sourceType": "module"
-  },
-  "plugins": ["prettier", "@typescript-eslint"]
+    "sourceType": "module",
+    "project": ["./tsconfig.eslint.json"]
+  }
 }

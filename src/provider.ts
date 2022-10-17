@@ -75,7 +75,7 @@ export class WalletConnectProvider implements SignerProvider {
     } else {
       this.nodeProvider = undefined
     }
-    if (this.methods.includes('alph_requestNodeApi')) {
+    if (this.methods.includes('alph_requestExplorerApi')) {
       this.explorerProvider = ExplorerProvider.Remote(this.requestExplorerAPI)
     } else {
       this.explorerProvider = undefined

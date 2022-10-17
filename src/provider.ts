@@ -23,7 +23,7 @@ import {
 } from '@alephium/web3'
 
 import { LOGGER, PROVIDER_NAMESPACE, RELAY_METHODS, RELAY_URL } from './constants'
-import { ChainGroup, RelayMethodParams, RelayMethodResult, NetworkId, ProviderEvent, ProviderEventArgument, RelayMethod } from './types'
+import { ChainGroup, RelayMethodParams, RelayMethodResult, NetworkId, ProviderEvent, ProviderEventArgument, RelayMethod, ProjectMetaData } from './types'
 
 export interface ProviderOptions {
   // Alephium options
@@ -33,7 +33,7 @@ export interface ProviderOptions {
 
   // WalletConnect options
   projectId?: string;
-  metadata?: SignClientTypes.Metadata; // metadata used to initialize a sign client
+  metadata?: ProjectMetaData; // metadata used to initialize a sign client
   logger?: string; // default logger level is Error; no need to configure in most cases
   client?: SignClient; // existing sign client; no need to configure in most cases
   relayUrl?: string; // the url of the relay server; no need to configure in most cases

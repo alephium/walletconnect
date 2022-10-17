@@ -76,3 +76,5 @@ export interface ChainInfo {
   networkId: NetworkId;
   chainGroup: ChainGroup;
 }
+
+export type ProjectMetaData = SignClientTypes.Metadata

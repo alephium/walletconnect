@@ -34,6 +34,7 @@
   "dependencies": {
     "@alephium/web3": "0.2.0-rc.36",
     "@alephium/web3-wallet": "0.2.0-rc.36",
+    "@walletconnect/qrcode-modal": "^1.8.0",
     "@walletconnect/sign-client": "2.0.0-rc.3",
     "@walletconnect/types": "2.0.0-rc.3",
     "@walletconnect/utils": "2.0.0-rc.3",

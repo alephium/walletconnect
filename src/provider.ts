@@ -62,8 +62,7 @@ export class WalletConnectProvider implements SignerProvider {
     return provider
   }
 
-  // Please instantiate a provide with `init(opts)` always
-  constructor(opts: ProviderOptions) {
+  private constructor(opts: ProviderOptions) {
     this.providerOpts = opts
     this.networkId = opts.networkId
     this.chainGroup = opts.chainGroup

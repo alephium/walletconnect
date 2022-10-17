@@ -119,11 +119,11 @@ describe('Unit tests', function() {
     expect(() => parseChain('alephium:4/-2')).toThrow()
   })
 
-  it('should initialize providers', () => {
-    const provider0 = new WalletConnectProvider(TEST_PROVIDER_OPTS)
+  it('should initialize providers', async () => {
+    const provider0 = await WalletConnectProvider.init(TEST_PROVIDER_OPTS)
     expect(provider0.nodeProvider !== undefined).toEqual(true)
     expect(provider0.explorerProvider !== undefined).toEqual(true)
-    const provider1 = new WalletConnectProvider({ ...TEST_PROVIDER_OPTS, methods: [] })
+    const provider1 = await WalletConnectProvider.init({ ...TEST_PROVIDER_OPTS, methods: [] })
     expect(provider1.nodeProvider === undefined).toEqual(true)
     expect(provider1.explorerProvider === undefined).toEqual(true)
   })

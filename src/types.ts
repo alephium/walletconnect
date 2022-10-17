@@ -54,6 +54,7 @@ type RelayMethodsTable = {
     result: any
   }
 }
+
 assertType<Eq<RelayMethod, keyof RelayMethodsTable>>()
 export type RelayMethodParams<T extends RelayMethod> = RelayMethodsTable[T]['params'];
 export type RelayMethodResult<T extends RelayMethod> = RelayMethodsTable[T]['result'];

@@ -1,5 +1,5 @@
 import EventEmitter from 'eventemitter3'
-import { SessionTypes, SignClientTypes } from '@walletconnect/types'
+import { SessionTypes } from '@walletconnect/types'
 import SignClient from '@walletconnect/sign-client'
 import { getChainsFromNamespaces, getAccountsFromNamespaces, getSdkError } from '@walletconnect/utils'
 import {
@@ -23,7 +23,7 @@ import {
 } from '@alephium/web3'
 
 import { LOGGER, PROVIDER_NAMESPACE, RELAY_METHODS, RELAY_URL } from './constants'
-import { ChainGroup, RelayMethodParams, RelayMethodResult, NetworkId, ProviderEvent, ProviderEventArgument, RelayMethod, ProjectMetaData } from './types'
+import { ChainGroup, RelayMethodParams, RelayMethodResult, ProviderEvent, ProviderEventArgument, RelayMethod, ProjectMetaData, ChainInfo } from './types'
 
 export interface ProviderOptions {
   // Alephium options
@@ -318,7 +318,7 @@ export function isCompatibleChain(chain: string): boolean {
   return chain.startsWith(`${PROVIDER_NAMESPACE}:`)
 }
 
-export function isCompatibleChainGroup(group: ChainGroup, expectedChainGroup?: ChainGroup): boolean {
+export function isCompatibleChainGroup(group: number, expectedChainGroup: ChainGroup): boolean {
   return expectedChainGroup === undefined || expectedChainGroup === group
 }
 
@@ -330,13 +330,13 @@ export function formatChain(networkId: number, chainGroup: ChainGroup): string {
   return `${PROVIDER_NAMESPACE}:${networkId}/${chainGroupEncoded}`
 }
 
-export function parseChain(chainString: string): [NetworkId, ChainGroup] {
+export function parseChain(chainString: string): ChainInfo {
   const [_namespace, networkId, chainGroup] = chainString.replace(/\//g, ':').split(':')
   const chainGroupDecoded = parseInt(chainGroup, 10)
   if (chainGroupDecoded < -1) {
     throw Error('Chain group in protocol needs to be either -1 or non-negative')
   }
-  return [parseInt(networkId, 10), chainGroupDecoded === -1 ? undefined : chainGroupDecoded]
+  return { networkId: parseInt(networkId, 10), chainGroup: chainGroupDecoded === -1 ? undefined : chainGroupDecoded }
 }
 
 export function formatAccount(permittedChain: string, account: Account): string {

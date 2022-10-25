@@ -59,14 +59,21 @@ export type RelayMethodParams<T extends RelayMethod> = RelayMethodsTable[T]['par
 export type RelayMethodResult<T extends RelayMethod> = RelayMethodsTable[T]['result'];
 
 type ProviderEventArguments = {
+  displayUri: string
+  accountChanged: Account
+
   session_ping: SignClientTypes.EventArguments['session_ping']
   session_update: SignClientTypes.EventArguments['session_update']
   session_delete: SignClientTypes.EventArguments['session_delete']
   session_event: SignClientTypes.EventArguments['session_event']
-  displayUri: string
-  accountChanged: Account
 }
-export type ProviderEvent = 'session_ping' | 'session_update' | 'session_delete' | 'session_event' | 'displayUri' | 'accountChanged';
+export type ProviderEvent =
+  | 'displayUri'
+  | 'accountChanged'
+  | 'session_ping'
+  | 'session_update'
+  | 'session_delete'
+  | 'session_event'
 assertType<Eq<ProviderEvent, keyof ProviderEventArguments>>()
 export type ProviderEventArgument<T extends ProviderEvent> = ProviderEventArguments[T];
 

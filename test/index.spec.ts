@@ -113,9 +113,9 @@ describe('Unit tests', function() {
     expect(formatChain(4, expectedChainGroup1)).toEqual('alephium:4/1')
     expect(formatChain(4, undefined)).toEqual('alephium:4/-1')
     expect(() => formatChain(4, -1)).toThrow()
-    expect(parseChain('alephium:4/2')).toEqual([4, 2])
-    expect(parseChain('alephium:4/1')).toEqual([4, 1])
-    expect(parseChain('alephium:4/-1')).toEqual([4, undefined])
+    expect(parseChain('alephium:4/2')).toEqual({ networkId: 4, chainGroup: 2 })
+    expect(parseChain('alephium:4/1')).toEqual({ networkId: 4, chainGroup: 1 })
+    expect(parseChain('alephium:4/-1')).toEqual({ networkId: 4, chainGroup: undefined })
     expect(() => parseChain('alephium:4/-2')).toThrow()
   })
 

@@ -1,6 +1,10 @@
 # Alephium Walletconnect
 
-## Code as doc for now
+## Getting started
+
+```
+npm i @alephium/walletconnect-provider@0.2.0
+```
 
 ## Test
 

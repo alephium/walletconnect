@@ -20,6 +20,7 @@ import {
   NodeProvider,
   ExplorerProvider,
   ApiRequestArguments,
+  Address,
 } from '@alephium/web3'
 
 import { LOGGER, PROVIDER_NAMESPACE, RELAY_METHODS, RELAY_URL } from './constants'
@@ -129,11 +130,11 @@ export class WalletConnectProvider implements SignerProvider {
 
   // ---------- Signer Methods ----------------------------------------------- //
 
-  public getSelectedAccount(): Promise<Account> {
+  public getSelectedAddress(): Promise<Address> {
     if (this.account === undefined) {
       throw Error('Account is not available')
     }
-    return Promise.resolve(this.account)
+    return Promise.resolve(this.account.address)
   }
 
   public async signAndSubmitTransferTx(params: SignTransferTxParams): Promise<SignTransferTxResult> {
@@ -238,8 +239,8 @@ export class WalletConnectProvider implements SignerProvider {
       if (typeof signerAddress === 'undefined') {
         throw new Error('Cannot request without signerAddress')
       }
-      const selectedAccount = await this.getSelectedAccount()
-      if (signerAddress !== selectedAccount.address) {
+      const selectedAddress = await this.getSelectedAddress()
+      if (signerAddress !== selectedAddress) {
         throw new Error(`Invalid signer address: ${args.params.signerAddress}`)
       }
     }

@@ -11,6 +11,7 @@ import {
   NodeProvider,
   verifySignedMessage,
   Project,
+  groupOfAddress,
 } from '@alephium/web3'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import { SignClientTypes } from '@walletconnect/types'
@@ -143,8 +144,8 @@ describe('WalletConnectProvider with single chainGroup', function() {
     expect(walletAddress).toEqual(ACCOUNTS.a.address)
     await provider.connect()
     expect(provider.permittedChain).toEqual('alephium:4/0')
-    const selectetAccount = await provider.getSelectedAccount()
-    expect(selectetAccount.address).toEqual(signerA.address)
+    const selectetAddress = await provider.getSelectedAddress()
+    expect(selectetAddress).toEqual(signerA.address)
   })
 
   afterAll(async () => {
@@ -173,9 +174,9 @@ describe('WalletConnectProvider with single chainGroup', function() {
 
   it('accountChanged', async () => {
     // change to account within the same group
-    const currentAccount = (await provider.getSelectedAccount())
-    expect(currentAccount.address).toEqual(ACCOUNTS.a.address)
-    const newAccount = PrivateKeyWallet.Random(currentAccount.group)
+    const currentAddress = (await provider.getSelectedAddress())
+    expect(currentAddress).toEqual(ACCOUNTS.a.address)
+    const newAccount = PrivateKeyWallet.Random(groupOfAddress(currentAddress))
     await verifyAccountsChange(newAccount.privateKey, newAccount.address, provider, walletClient)
 
     // change back to account a
@@ -210,8 +211,8 @@ describe('WalletConnectProvider with arbitrary chainGroup', function() {
     expect(walletAddress).toEqual(ACCOUNTS.a.address)
     await provider.connect()
     expect(provider.permittedChain).toEqual('alephium:4/-1')
-    const selectedAccount = await provider.getSelectedAccount()
-    expect(selectedAccount.address).toEqual(signerA.address)
+    const selectedAddress = await provider.getSelectedAddress()
+    expect(selectedAddress).toEqual(signerA.address)
   })
 
   afterAll(async () => {
@@ -298,9 +299,9 @@ async function verifySign(
   }
 
   await Project.build()
-  const selectedAccount = await provider.getSelectedAccount()
+  const selectedAddress = await provider.getSelectedAddress()
 
-  expect(selectedAccount.address).toEqual(ACCOUNTS.a.address)
+  expect(selectedAddress).toEqual(ACCOUNTS.a.address)
 
   balance = await nodeProvider.addresses.getAddressesAddressBalance(ACCOUNTS.a.address)
   expect(balance.utxoNum).toEqual(1)

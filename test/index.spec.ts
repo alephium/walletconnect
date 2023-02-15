@@ -15,6 +15,7 @@ import {
 } from '@alephium/web3'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import { SignClientTypes } from '@walletconnect/types'
+import { Greeter, Main } from '../artifacts/ts'
 
 const NETWORK_ID = 4
 const CHAIN_GROUP = 0
@@ -312,15 +313,13 @@ async function verifySign(
   })
 
   await checkBalanceDecreasing()
-  const greeter = Project.contract('Greeter')
 
-  const greeterResult = await greeter.deploy(provider, {
+  const greeterResult = await Greeter.deploy(provider, {
     initialFields: { btcPrice: 1n },
   })
   await checkBalanceDecreasing()
 
-  const main = Project.script('Main')
-  await main.execute(provider, {
+  await Main.execute(provider, {
     initialFields: { greeterContractId: greeterResult.contractId },
   })
   await checkBalanceDecreasing()

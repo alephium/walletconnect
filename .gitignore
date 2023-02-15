@@ -34,5 +34,6 @@ result*
 ops/grafana/grafana.ini
 artifacts/
 coverage/
+.project.json
 
 .vscode

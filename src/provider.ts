@@ -40,7 +40,7 @@ export interface ProviderOptions {
   relayUrl?: string; // the url of the relay server; no need to configure in most cases
 }
 
-export class WalletConnectProvider implements SignerProvider {
+export class WalletConnectProvider extends SignerProvider {
   private providerOpts: ProviderOptions
 
   public events: EventEmitter = new EventEmitter()
@@ -64,6 +64,8 @@ export class WalletConnectProvider implements SignerProvider {
   }
 
   private constructor(opts: ProviderOptions) {
+    super()
+
     this.providerOpts = opts
     this.networkId = opts.networkId
     this.chainGroup = opts.chainGroup
@@ -130,11 +132,11 @@ export class WalletConnectProvider implements SignerProvider {
 
   // ---------- Signer Methods ----------------------------------------------- //
 
-  public getSelectedAddress(): Promise<Address> {
+  protected unsafeGetSelectedAccount(): Promise<Account> {
     if (this.account === undefined) {
       throw Error('Account is not available')
     }
-    return Promise.resolve(this.account.address)
+    return Promise.resolve(this.account)
   }
 
   public async signAndSubmitTransferTx(params: SignTransferTxParams): Promise<SignTransferTxResult> {
@@ -239,7 +241,7 @@ export class WalletConnectProvider implements SignerProvider {
       if (typeof signerAddress === 'undefined') {
         throw new Error('Cannot request without signerAddress')
       }
-      const selectedAddress = await this.getSelectedAddress()
+      const selectedAddress = (await this.getSelectedAccount()).address
       if (signerAddress !== selectedAddress) {
         throw new Error(`Invalid signer address: ${args.params.signerAddress}`)
       }
@@ -341,12 +343,15 @@ export function parseChain(chainString: string): ChainInfo {
 }
 
 export function formatAccount(permittedChain: string, account: Account): string {
-  return `${permittedChain}:${account.publicKey}`
+  return `${permittedChain}:${account.publicKey}/${account.keyType}`
 }
 
 export function parseAccount(account: string): Account {
-  const [_namespace, _networkId, _group, publicKey] = account.replace(/\//g, ':').split(':')
+  const [_namespace, _networkId, _group, publicKey, keyType] = account.replace(/\//g, ':').split(':')
   const address = addressFromPublicKey(publicKey)
   const group = groupOfAddress(address)
-  return { address, group, publicKey }
+  if (keyType !== 'default' && keyType !== 'bip340-schnorr') {
+    throw Error(`Invalid key type: ${keyType}`)
+  }
+  return { address, group, publicKey, keyType }
 }

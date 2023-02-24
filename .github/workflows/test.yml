@@ -13,6 +13,10 @@ jobs:
         with:
           fetch-depth: 0
           submodules: true
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
       - name: Lint and Audit
         run: |
           npm ci
@@ -24,6 +28,7 @@ jobs:
           docker-compose up -d
           popd
           SECONDS=0
+          sleep 5
           until curl http://localhost:22973/infos/node
           do
             if (( SECONDS > 60 ))
@@ -35,5 +40,5 @@ jobs:
             sleep 5
           done
           echo "Alephium full node is up"
-          npx --yes @alephium/cli@0.5.0-rc.3 compile
+          npx --yes @alephium/cli@0.5.0 compile
           npm run test

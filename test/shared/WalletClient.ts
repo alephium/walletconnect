@@ -21,6 +21,7 @@ import {
   isCompatibleChainGroup,
   RelayMethod,
   WalletConnectProvider,
+  formatAccount,
 } from '../../src'
 import SignClient from '@walletconnect/sign-client'
 import { getSdkError } from '@walletconnect/utils'
@@ -66,6 +67,7 @@ export class WalletClient {
     return {
       address: this.signer.address,
       publicKey: this.signer.publicKey,
+      keyType: this.signer.keyType,
       group: this.signer.group,
     }
   }
@@ -133,7 +135,7 @@ export class WalletClient {
   private getWallet(privateKey?: string): PrivateKeyWallet {
     const wallet =
       typeof privateKey !== 'undefined'
-        ? new PrivateKeyWallet(privateKey)
+        ? new PrivateKeyWallet({ privateKey })
         : PrivateKeyWallet.Random()
     return wallet
   }
@@ -148,7 +150,7 @@ export class WalletClient {
       namespaces: {
         alephium: {
           ...this.namespace,
-          accounts: [`${chainId}:${this.account.publicKey}`],
+          accounts: [formatAccount(chainId, this.account)],
         },
       },
     })
@@ -172,9 +174,7 @@ export class WalletClient {
           const group = addressToGroup(account.address, 4)
           return chainGroup === undefined || group === (chainGroup as number)
         })
-        .map((account) =>
-          `${chain}:${account.publicKey}`,
-        )
+        .map((account) => formatAccount(chain, account))
 
       return accounts
     })

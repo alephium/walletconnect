@@ -343,7 +343,7 @@ export function parseChain(chainString: string): ChainInfo {
 }
 
 export function formatAccount(permittedChain: string, account: Account): string {
-  return `${permittedChain}:${account.publicKey}:${account.keyType}`
+  return `${permittedChain}:${account.publicKey}/${account.keyType}`
 }
 
 export function parseAccount(account: string): Account {

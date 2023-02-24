@@ -25,7 +25,7 @@ const RPC_URL = `http://localhost:${PORT}`
 const nodeProvider = new NodeProvider(RPC_URL)
 web3.setCurrentNodeProvider(RPC_URL)
 const signerA = new PrivateKeyWallet(
-  'a642942e67258589cd2b1822c631506632db5a12aabcf413604e785300d762a5',
+  { privateKey: 'a642942e67258589cd2b1822c631506632db5a12aabcf413604e785300d762a5' },
 )
 const signerB = PrivateKeyWallet.Random(1)
 const signerC = PrivateKeyWallet.Random(2)
@@ -145,7 +145,7 @@ describe('WalletConnectProvider with single chainGroup', function() {
     expect(walletAddress).toEqual(ACCOUNTS.a.address)
     await provider.connect()
     expect(provider.permittedChain).toEqual('alephium:4/0')
-    const selectetAddress = await provider.getSelectedAddress()
+    const selectetAddress = (await provider.getSelectedAccount()).address
     expect(selectetAddress).toEqual(signerA.address)
   })
 
@@ -175,7 +175,7 @@ describe('WalletConnectProvider with single chainGroup', function() {
 
   it('accountChanged', async () => {
     // change to account within the same group
-    const currentAddress = (await provider.getSelectedAddress())
+    const currentAddress = (await provider.getSelectedAccount()).address
     expect(currentAddress).toEqual(ACCOUNTS.a.address)
     const newAccount = PrivateKeyWallet.Random(groupOfAddress(currentAddress))
     await verifyAccountsChange(newAccount.privateKey, newAccount.address, provider, walletClient)
@@ -212,7 +212,7 @@ describe('WalletConnectProvider with arbitrary chainGroup', function() {
     expect(walletAddress).toEqual(ACCOUNTS.a.address)
     await provider.connect()
     expect(provider.permittedChain).toEqual('alephium:4/-1')
-    const selectedAddress = await provider.getSelectedAddress()
+    const selectedAddress = (await provider.getSelectedAccount()).address
     expect(selectedAddress).toEqual(signerA.address)
   })
 
@@ -300,7 +300,7 @@ async function verifySign(
   }
 
   await Project.build()
-  const selectedAddress = await provider.getSelectedAddress()
+  const selectedAddress = (await provider.getSelectedAccount()).address
 
   expect(selectedAddress).toEqual(ACCOUNTS.a.address)
 
@@ -327,9 +327,10 @@ async function verifySign(
   const message = 'Hello Alephium!'
   const signedMessage = await provider.signMessage({
     message,
+    messageHasher: 'alephium',
     signerAddress: signerA.address,
   })
-  expect(verifySignedMessage(message, signerA.publicKey, signedMessage.signature)).toEqual(true)
+  expect(verifySignedMessage(message, 'alephium', signerA.publicKey, signedMessage.signature)).toEqual(true)
 }
 
 function delay(ms: number) {

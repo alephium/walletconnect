@@ -88,6 +88,6 @@
     "semi": false,
     "singleQuote": true,
     "bracketSameLine": false,
-    "trailingComma": "none"
+    "trailingComma": "all"
   }
 }
